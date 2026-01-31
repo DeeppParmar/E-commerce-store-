@@ -1,8 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
-import { ShoppingCart, User, Menu, X, Gavel } from "lucide-react";
+import { ShoppingCart, User, Menu, X, Gavel, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/auth/AuthContext";
 
 const navLinks = [
   { href: "/auctions", label: "Auctions" },
@@ -13,6 +14,7 @@ const navLinks = [
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { isAuthenticated, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -53,11 +55,28 @@ export function Header() {
               </span>
             </Button>
           </Link>
-          <Link to="/profile" className="hidden sm:block">
-            <Button variant="ghost" size="icon">
-              <User className="h-5 w-5" />
+
+          {isAuthenticated ? (
+            <>
+              <Link to="/profile" className="hidden sm:block">
+                <Button variant="ghost" size="icon">
+                  <User className="h-5 w-5" />
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden sm:inline-flex"
+                onClick={logout}
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </>
+          ) : (
+            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+              <Link to="/login">Login</Link>
             </Button>
-          </Link>
+          )}
           
           {/* Mobile Menu Toggle */}
           <Button
@@ -90,13 +109,35 @@ export function Header() {
                 {link.label}
               </Link>
             ))}
-            <Link
-              to="/profile"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
-            >
-              Profile
-            </Link>
+
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                >
+                  Profile
+                </Link>
+                <button
+                  onClick={() => {
+                    logout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-4 py-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              >
+                Login
+              </Link>
+            )}
           </nav>
         </div>
       )}
