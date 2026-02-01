@@ -52,7 +52,7 @@ export function Header() {
                     "px-4 py-2 rounded-lg text-sm font-medium transition-colors stroke-hover",
                     isActive
                       ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      : "text-muted-foreground"
                   )}
                 >
                   {link.label}
@@ -104,10 +104,21 @@ export function Header() {
               setTheme(resolvedTheme === "dark" ? "light" : "dark");
             }}
           >
-            {isMounted && resolvedTheme === "dark" ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
+            {isMounted && (
+              <span className="relative h-5 w-5">
+                <Sun
+                  className={cn(
+                    "absolute inset-0 h-5 w-5 transition-transform duration-300",
+                    resolvedTheme === "dark" ? "rotate-0 scale-100" : "-rotate-90 scale-0"
+                  )}
+                />
+                <Moon
+                  className={cn(
+                    "absolute inset-0 h-5 w-5 transition-transform duration-300",
+                    resolvedTheme === "dark" ? "rotate-90 scale-0" : "rotate-0 scale-100"
+                  )}
+                />
+              </span>
             )}
           </Button>
           
@@ -142,7 +153,7 @@ export function Header() {
                     "px-4 py-3 rounded-lg text-sm font-medium transition-colors stroke-hover",
                     isActive
                       ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      : "text-muted-foreground"
                   )}
                 >
                   {link.label}
@@ -155,7 +166,7 @@ export function Header() {
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  className="px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground transition-colors stroke-hover"
                 >
                   Profile
                 </Link>
@@ -173,7 +184,7 @@ export function Header() {
               <Link
                 to="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                className="px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground transition-colors stroke-hover"
               >
                 Login
               </Link>
