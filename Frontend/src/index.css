@@ -281,21 +281,6 @@
     @apply bg-background text-foreground;
     transition: background-color 240ms ease, color 240ms ease;
   }
-
-  body *,
-  body *::before,
-  body *::after {
-    transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, fill 240ms ease, stroke 240ms ease;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body *,
-  body *::before,
-  body *::after {
-    transition: none !important;
-    animation: none !important;
-  }
 }
 
 @layer utilities {
