@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Gavel, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BlobButton } from "@/components/ui/blob-button";
 import { AuctionCard } from "@/components/auction/AuctionCard";
 import { ProductCard } from "@/components/product/ProductCard";
 import { liveAuctions, endingSoonAuctions, featuredProducts } from "@/data/mockData";
@@ -25,12 +26,10 @@ export default function Home() {
               Bid on rare finds or shop premium products.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Button size="lg" asChild>
-                <Link to="/auctions">
-                  <Gavel className="h-5 w-5" />
-                  Explore Auctions
-                </Link>
-              </Button>
+              <BlobButton to="/auctions" size="lg">
+                <Gavel className="h-5 w-5" />
+                Explore Auctions
+              </BlobButton>
               <Button size="lg" variant="outline" asChild>
                 <Link to="/shop">
                   Browse Shop
@@ -140,11 +139,9 @@ export default function Home() {
             <p className="text-muted-foreground mb-8">
               List your items and reach thousands of buyers. No listing fees, just results.
             </p>
-            <Button size="lg" asChild>
-              <Link to="/sell">
-                Start Selling Today
-              </Link>
-            </Button>
+            <BlobButton to="/sell" size="lg">
+              Start Selling Today
+            </BlobButton>
           </div>
         </div>
       </section>

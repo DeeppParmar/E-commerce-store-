@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { ShoppingCart, User, Menu, X, Gavel, LogOut } from "lucide-react";
+import { ShoppingCart, User, Menu, X, Gavel, LogOut, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/auth/AuthContext";
+import { useTheme } from "next-themes";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -16,6 +17,12 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { isAuthenticated, logout } = useAuth();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -87,6 +94,22 @@ export function Header() {
               <Link to="/login">Login</Link>
             </Button>
           )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle theme"
+            onClick={() => {
+              if (!isMounted) return;
+              setTheme(resolvedTheme === "dark" ? "light" : "dark");
+            }}
+          >
+            {isMounted && resolvedTheme === "dark" ? (
+              <Sun className="h-5 w-5" />
+            ) : (
+              <Moon className="h-5 w-5" />
+            )}
+          </Button>
           
           {/* Mobile Menu Toggle */}
           <Button
