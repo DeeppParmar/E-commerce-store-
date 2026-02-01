@@ -9,6 +9,7 @@ export default function ProductDetail() {
   const { id } = useParams();
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isCartAnimating, setIsCartAnimating] = useState(false);
 
   const product = featuredProducts.find((p) => p.id === id) || featuredProducts[0];
 
@@ -20,6 +21,11 @@ export default function ProductDetail() {
   ];
 
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
+
+  const triggerCartAnimation = () => {
+    setIsCartAnimating(true);
+    window.setTimeout(() => setIsCartAnimating(false), 350);
+  };
 
   return (
     <div className="animate-fade-in">
@@ -126,7 +132,12 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              <Button variant="bid" size="xl" className="w-full">
+              <Button
+                variant="bid"
+                size="xl"
+                className={cn("w-full", isCartAnimating && "animate-cart-click")}
+                onClick={triggerCartAnimation}
+              >
                 Add to Cart - ${(product.price * quantity).toLocaleString()}
               </Button>
             </div>
@@ -194,7 +205,12 @@ export default function ProductDetail() {
 
       {/* Mobile Sticky Add to Cart */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border">
-        <Button variant="bid" size="lg" className="w-full">
+        <Button
+          variant="bid"
+          size="lg"
+          className={cn("w-full", isCartAnimating && "animate-cart-click")}
+          onClick={triggerCartAnimation}
+        >
           Add to Cart - ${(product.price * quantity).toLocaleString()}
         </Button>
       </div>

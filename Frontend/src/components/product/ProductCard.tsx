@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 export interface ProductData {
   id: string;
@@ -22,6 +23,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const discountPercent = hasDiscount
     ? Math.round((1 - product.price / product.originalPrice!) * 100)
     : 0;
+
+  const [isCartAnimating, setIsCartAnimating] = useState(false);
 
   return (
     <div
@@ -65,7 +68,15 @@ export function ProductCard({ product, className }: ProductCardProps) {
             )}
           </div>
           
-          <Button variant="outline" size="icon" className="h-9 w-9">
+          <Button
+            variant="outline"
+            size="icon"
+            className={cn("h-9 w-9", isCartAnimating && "animate-cart-click")}
+            onClick={() => {
+              setIsCartAnimating(true);
+              window.setTimeout(() => setIsCartAnimating(false), 350);
+            }}
+          >
             <ShoppingCart className="h-4 w-4" />
           </Button>
         </div>
