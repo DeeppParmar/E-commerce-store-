@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# production builds
+/dist/
+Frontend/dist/
+Backend/dist/
+
+# env files (never commit)
+.env
+.env.*
+Backend/.env
+Backend/.env.*
+Frontend/.env
+Frontend/.env.*
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# misc
+.DS_Store
+.vscode/
+.idea/
