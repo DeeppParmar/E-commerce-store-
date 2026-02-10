@@ -57,7 +57,7 @@ class ApiClient {
             user: any;
             session: { access_token: string };
             message: string;
-        }>('/auth/login', {
+        }>('/api/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email, password, fullName }),
         });
@@ -71,7 +71,7 @@ class ApiClient {
 
     async logout() {
         try {
-            await this.request('/auth/logout', { method: 'POST' });
+            await this.request('/api/auth/logout', { method: 'POST' });
         } finally {
             this.setToken(null);
         }
@@ -82,7 +82,7 @@ class ApiClient {
             const data = await this.request<{
                 user: any;
                 session: { access_token: string };
-            }>('/auth/session');
+            }>('/api/auth/session');
             return data;
         } catch (error) {
             this.setToken(null);
@@ -93,12 +93,12 @@ class ApiClient {
     // Auctions endpoints
     async getAuctions(status: string = 'active') {
         return this.request<{ auctions: any[] }>(
-            `/auctions/index?status=${status}`
+            `/api/auctions/index?status=${status}`
         );
     }
 
     async getAuction(id: string) {
-        return this.request<{ auction: any }>(`/auctions/${id}`);
+        return this.request<{ auction: any }>(`/api/auctions/${id}`);
     }
 
     async createAuction(data: {
@@ -109,7 +109,7 @@ class ApiClient {
         end_time: string;
     }) {
         return this.request<{ auction: any; message: string }>(
-            '/auctions/create',
+            '/api/auctions/create',
             {
                 method: 'POST',
                 body: JSON.stringify(data),
@@ -119,7 +119,7 @@ class ApiClient {
 
     // Bids endpoints
     async placeBid(auction_id: string, amount: number) {
-        return this.request<{ success: boolean; result: any }>('/bids/place', {
+        return this.request<{ success: boolean; result: any }>('/api/bids/place', {
             method: 'POST',
             body: JSON.stringify({ auction_id, amount }),
         });
@@ -127,7 +127,7 @@ class ApiClient {
 
     // Profile endpoints
     async getProfile() {
-        return this.request<{ profile: any }>('/profile/me');
+        return this.request<{ profile: any }>('/api/profile/me');
     }
 }
 
