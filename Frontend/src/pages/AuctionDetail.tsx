@@ -1,38 +1,134 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CountdownTimer } from "@/components/auction/CountdownTimer";
 import { BidInput } from "@/components/auction/BidInput";
-import { allAuctions } from "@/data/mockData";
 import { Heart, Share2, Shield, User, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { useAuctionRealtime } from "@/hooks/useAuctionRealtime";
+import { useAuth } from "@/auth/AuthContext";
 
-// Mock bid history
-const bidHistory = [
-  { user: "collector_89", amount: 12500, time: "2 min ago" },
-  { user: "art_lover", amount: 12200, time: "5 min ago" },
-  { user: "premium_buyer", amount: 12000, time: "12 min ago" },
-  { user: "vintage_fan", amount: 11500, time: "20 min ago" },
-  { user: "john_d", amount: 11000, time: "35 min ago" },
-];
+type AuctionDetailType = {
+  id: string;
+  title: string;
+  description: string;
+  images: string[];
+  current_price: number;
+  starting_price: number;
+  end_time: string;
+  status: string;
+  seller_id: string;
+  seller: {
+    full_name: string;
+    avatar_url: string;
+  };
+  bids: {
+    id: string;
+    amount: number;
+    created_at: string;
+    bidder: {
+      full_name: string;
+      avatar_url: string;
+    };
+  }[];
+  _count?: {
+    bids: number
+  }
+};
 
 export default function AuctionDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const [auction, setAuction] = useState<AuctionDetailType | null>(null);
+  const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
-  const auction = allAuctions.find((a) => a.id === id) || allAuctions[0];
-  
-  // Mock multiple images
-  const images = [
-    auction.image,
-    "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&h=800&fit=crop",
-    "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&h=800&fit=crop",
-  ];
+  const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
 
-  const handlePlaceBid = (amount: number) => {
-    console.log("Placing bid:", amount);
-    // Would integrate with backend
+  // Real-time updates
+  useAuctionRealtime({
+    auctionId: id,
+    onBid: (newBid) => {
+      setAuction((prev) => {
+        if (!prev) return null;
+        // Optimistically update price and add bid to list if we had user info, 
+        // but for now we might just re-fetch or manual update if we don't have bidder info in payload
+        // The payload usually only has raw table data.
+        // For simple UI update:
+        return {
+          ...prev,
+          current_price: newBid.amount,
+          bids: [
+            {
+              ...newBid,
+              bidder: { full_name: "New Bidder", avatar_url: "" } // Placeholder until re-fetch
+            },
+            ...prev.bids
+          ]
+        };
+      });
+    },
+    onAuctionUpdate: (updatedAuction) => {
+      setAuction((prev) => prev ? { ...prev, ...updatedAuction } : null);
+    }
+  });
+
+  useEffect(() => {
+    const fetchAuction = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const res = await fetch(`${baseUrl}/api/auctions/${id}`);
+        if (!res.ok) throw new Error("Failed to fetch auction");
+        const data = await res.json();
+        setAuction(data.auction);
+      } catch (error) {
+        toast({ title: "Error", description: "Could not load auction details", variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) fetchAuction();
+  }, [id, toast]);
+
+  const handlePlaceBid = async (amount: number) => {
+    if (!isAuthenticated) {
+      toast({ title: "Login Required", description: "Please login to place a bid", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const token = (await import("@/lib/supabase").then(m => m.supabase.auth.getSession())).data.session?.access_token;
+
+      const res = await fetch(`${baseUrl}/api/bids`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          auctionId: id,
+          amount: amount
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to place bid");
+      }
+
+      toast({ title: "Success", description: "Bid placed successfully!" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   };
+
+  if (loading) return <div className="container py-12 text-center animate-pulse">Loading auction details...</div>;
+  if (!auction) return <div className="container py-12 text-center">Auction not found</div>;
+
+  const images = auction.images && auction.images.length > 0 ? auction.images : ["https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&h=600&fit=crop"];
+  const isLive = auction.status === 'active';
+  const totalBids = auction.bids ? auction.bids.length : 0;
 
   return (
     <div className="animate-fade-in">
@@ -46,7 +142,7 @@ export default function AuctionDetail() {
                 alt={auction.title}
                 className="w-full h-full object-cover"
               />
-              
+
               {/* Navigation Arrows */}
               {images.length > 1 && (
                 <>
@@ -66,7 +162,7 @@ export default function AuctionDetail() {
               )}
 
               {/* Live Badge */}
-              {auction.isLive && (
+              {isLive && (
                 <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-urgent text-urgent-foreground text-sm font-medium">
                   <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
                   LIVE
@@ -98,7 +194,7 @@ export default function AuctionDetail() {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold mb-2">{auction.title}</h1>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span>{auction.totalBids} bids</span>
+                <span>{totalBids} bids</span>
                 <span>•</span>
                 <span>15 watching</span>
               </div>
@@ -110,21 +206,27 @@ export default function AuctionDetail() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Current Bid</p>
                   <p className="text-3xl md:text-4xl font-bold text-foreground">
-                    ${auction.currentBid.toLocaleString()}
+                    ${auction.current_price.toLocaleString()}
                   </p>
                 </div>
                 <div className="text-left sm:text-right">
                   <p className="text-sm text-muted-foreground mb-2">Ends in</p>
-                  <CountdownTimer endTime={auction.endTime} size="lg" />
+                  <CountdownTimer endTime={new Date(auction.end_time)} size="lg" />
                 </div>
               </div>
 
               {/* Bid Input */}
-              <BidInput
-                currentBid={auction.currentBid}
-                minIncrement={50}
-                onPlaceBid={handlePlaceBid}
-              />
+              {isLive ? (
+                <BidInput
+                  currentBid={auction.current_price}
+                  minIncrement={10} // Could make this dynamic
+                  onPlaceBid={handlePlaceBid}
+                />
+              ) : (
+                <div className="p-4 bg-muted rounded-lg text-center font-medium">
+                  This auction has ended.
+                </div>
+              )}
             </div>
 
             {/* Actions */}
@@ -142,12 +244,16 @@ export default function AuctionDetail() {
             {/* Seller Info */}
             <div className="p-4 rounded-xl bg-card border border-border">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
-                  <User className="h-6 w-6 text-muted-foreground" />
+                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                  {auction.seller?.avatar_url ? (
+                    <img src={auction.seller.avatar_url} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-6 w-6 text-muted-foreground" />
+                  )}
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium">Premium Seller</p>
-                  <p className="text-sm text-muted-foreground">98% positive feedback • 245 sales</p>
+                  <p className="font-medium">{auction.seller?.full_name || "Unknown Seller"}</p>
+                  <p className="text-sm text-muted-foreground">Seller</p>
                 </div>
                 <Shield className="h-5 w-5 text-primary" />
               </div>
@@ -157,49 +263,42 @@ export default function AuctionDetail() {
             <div>
               <h3 className="font-semibold mb-4">Bid History</h3>
               <div className="space-y-2">
-                {bidHistory.map((bid, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-card border border-border"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-medium">
-                        {bid.user.charAt(0).toUpperCase()}
+                {auction.bids && auction.bids.length > 0 ? (
+                  auction.bids.map((bid) => (
+                    <div
+                      key={bid.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-card border border-border"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-medium overflow-hidden">
+                          {bid.bidder?.avatar_url ? (
+                            <img src={bid.bidder.avatar_url} className="w-full h-full object-cover" />
+                          ) : (
+                            (bid.bidder?.full_name || "A").charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <span className="text-sm">{bid.bidder?.full_name || "Anonymous"}</span>
                       </div>
-                      <span className="text-sm">{bid.user}</span>
+                      <div className="text-right">
+                        <p className="font-medium">${bid.amount.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(bid.created_at).toLocaleTimeString()}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">${bid.amount.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">{bid.time}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-sm">No bids yet. Be the first!</p>
+                )}
               </div>
             </div>
 
-            {/* Auction Rules */}
-            <div className="p-4 rounded-xl bg-muted/50 border border-border">
-              <h4 className="font-medium mb-2">Auction Rules</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• All bids are final and binding</li>
-                <li>• Buyer premium: 10% of final bid</li>
-                <li>• Payment due within 48 hours</li>
-                <li>• Free shipping on orders over $500</li>
-              </ul>
+            {/* Description & Details moved to bottom or tabs if needed, keeping simple for now */}
+            <div className="p-4 rounded-xl bg-muted/50 border border-border mt-4">
+              <h4 className="font-medium mb-2">Description</h4>
+              <p className="text-sm text-muted-foreground">{auction.description}</p>
             </div>
+
           </div>
         </div>
-      </div>
-
-      {/* Mobile Sticky Bid Button */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-muted-foreground">Current Bid</span>
-          <span className="font-bold text-lg">${auction.currentBid.toLocaleString()}</span>
-        </div>
-        <Button variant="bid" size="lg" className="w-full">
-          Place Bid
-        </Button>
       </div>
     </div>
   );

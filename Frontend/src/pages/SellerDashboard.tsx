@@ -1,57 +1,143 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Plus, Package, DollarSign, TrendingUp, 
-  Calendar, Image as ImageIcon, ChevronRight
+import {
+  Plus, Package, DollarSign, TrendingUp,
+  Image as ImageIcon, ChevronRight, Edit
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/auth/AuthContext";
+import { Link } from "react-router-dom";
 
-// Mock seller data
-const myAuctions = [
-  {
-    id: "s1",
-    title: "Vintage Camera Collection",
-    image: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200&h=200&fit=crop",
-    currentBid: 450,
-    bids: 12,
-    endsIn: "2d 4h",
-    status: "live",
-  },
-  {
-    id: "s2",
-    title: "Rare Vinyl Records Set",
-    image: "https://images.unsplash.com/photo-1483412033650-1015ddeb83d1?w=200&h=200&fit=crop",
-    currentBid: 280,
-    bids: 8,
-    endsIn: "5d",
-    status: "live",
-  },
-];
-
-const soldItems = [
-  {
-    id: "sold1",
-    title: "Antique Pocket Watch",
-    image: "https://images.unsplash.com/photo-1509048191080-d2984bad6ae5?w=200&h=200&fit=crop",
-    soldFor: 1250,
-    date: "Jan 10, 2025",
-  },
-];
+type Auction = {
+  id: string;
+  title: string;
+  description: string;
+  starting_price: number;
+  current_price: number;
+  end_time: string;
+  status: string;
+  images: string[];
+  created_at: string;
+  winner_id?: string;
+};
 
 export default function SellerDashboard() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("overview"); // Use 'overview' for Active, 'sold' for Sold
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Stats
-  const stats = {
-    totalEarnings: 4580,
-    activeListings: 2,
-    totalSold: 12,
-    avgSalePrice: 382,
+  const [myAuctions, setMyAuctions] = useState<Auction[]>([]);
+  const [stats, setStats] = useState({
+    totalEarnings: 0,
+    activeListings: 0,
+    totalSold: 0,
+    avgSalePrice: 0,
+  });
+
+  // Form State
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startingPrice, setStartingPrice] = useState("");
+  const [duration, setDuration] = useState("1"); // days
+  const [imageUrl, setImageUrl] = useState("https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&h=600&fit=crop");
+
+  const fetchAuctions = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const token = (await import("@/lib/supabase").then(m => m.supabase.auth.getSession())).data.session?.access_token;
+      if (!token) return;
+
+      // Fetch all my auctions
+      const res = await fetch(`${baseUrl}/api/users/auctions`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const auctions: Auction[] = data.auctions || [];
+        setMyAuctions(auctions);
+
+        // Calculate Stats
+        const soldItems = auctions.filter(a => a.status === 'ended' && a.winner_id);
+        const activeItems = auctions.filter(a => a.status === 'active');
+        const totalEarnings = soldItems.reduce((sum, item) => sum + Number(item.current_price), 0);
+
+        setStats({
+          totalEarnings,
+          activeListings: activeItems.length,
+          totalSold: soldItems.length,
+          avgSalePrice: soldItems.length > 0 ? totalEarnings / soldItems.length : 0
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch auctions", error);
+    }
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchAuctions();
+    }
+  }, [user]);
+
+  const handleCreateAuction = async () => {
+    if (!title || !startingPrice || !imageUrl) {
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+      // Calculate End Time
+      const days = parseInt(duration);
+      const endTime = new Date();
+      endTime.setDate(endTime.getDate() + days);
+
+      const res = await fetch(`${baseUrl}/api/auctions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${(await import("@/lib/supabase").then(m => m.supabase.auth.getSession())).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          startingPrice: parseFloat(startingPrice),
+          endTime: endTime.toISOString(),
+          images: [imageUrl]
+        })
+      });
+
+      if (!res.ok) throw new Error("Failed to create auction");
+
+      toast({ title: "Success", description: "Auction created successfully!" });
+      setShowCreateForm(false);
+      // Reset form
+      setTitle("");
+      setDescription("");
+      setStartingPrice("");
+
+      // Refresh list
+      fetchAuctions();
+
+    } catch (error) {
+      toast({ title: "Error", description: "Could not create auction", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const displayedAuctions = activeTab === 'overview'
+    ? myAuctions.filter(a => a.status === 'active')
+    : myAuctions.filter(a => a.status === 'ended');
 
   return (
     <div className="animate-fade-in">
@@ -114,7 +200,7 @@ export default function SellerDashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg. Sale Price</p>
-                <p className="text-2xl font-bold">${stats.avgSalePrice}</p>
+                <p className="text-2xl font-bold">${stats.avgSalePrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </div>
@@ -147,57 +233,42 @@ export default function SellerDashboard() {
         </div>
 
         {/* Content */}
-        {activeTab === "overview" && (
-          <div className="space-y-4">
-            {myAuctions.map((auction) => (
-              <div
-                key={auction.id}
-                className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border"
-              >
-                <img
-                  src={auction.image}
-                  alt={auction.title}
-                  className="w-16 h-16 rounded-lg object-cover"
-                />
-                <div className="flex-1">
-                  <h3 className="font-medium">{auction.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {auction.bids} bids • Ends in {auction.endsIn}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">${auction.currentBid}</p>
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-success/20 text-success">
-                    Live
-                  </span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-            ))}
+        {displayedAuctions.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {activeTab === 'overview' ? "No active auctions found. Create one to get started!" : "No sold items yet."}
           </div>
-        )}
-
-        {activeTab === "sold" && (
+        ) : (
           <div className="space-y-4">
-            {soldItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border"
+            {displayedAuctions.map(auction => (
+              <Link
+                key={auction.id}
+                to={`/auctions/${auction.id}`}
+                className="block"
               >
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="w-16 h-16 rounded-lg object-cover"
-                />
-                <div className="flex-1">
-                  <h3 className="font-medium">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.date}</p>
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border hover:border-muted-foreground transition-colors">
+                  <img
+                    src={auction.images?.[0] || "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&h=600&fit=crop"}
+                    alt={auction.title}
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-medium">{auction.title}</h3>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>Current Price: ${auction.current_price.toLocaleString()}</span>
+                      <span>Ends: {new Date(auction.end_time).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={cn(
+                      "px-2 py-1 rounded-full text-xs font-medium",
+                      auction.status === 'active' ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    )}>
+                      {auction.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">${item.soldFor}</p>
-                  <span className="text-xs text-muted-foreground">Sold</span>
-                </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -205,55 +276,77 @@ export default function SellerDashboard() {
         {/* Create Auction Modal */}
         {showCreateForm && (
           <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="w-full max-w-lg p-6 rounded-xl bg-card border border-border animate-scale-in">
+            <div className="w-full max-w-lg p-6 rounded-xl bg-card border border-border animate-scale-in max-h-[90vh] overflow-y-auto">
               <h2 className="text-xl font-semibold mb-6">Create New Auction</h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="title">Title</Label>
-                  <Input id="title" placeholder="Item name" className="mt-1" />
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Item name"
+                    className="mt-1"
+                  />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" placeholder="Describe your item..." className="mt-1" />
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe your item..."
+                    className="mt-1"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="startingBid">Starting Bid</Label>
-                    <Input id="startingBid" type="number" placeholder="$0" className="mt-1" />
+                    <Label htmlFor="startingBid">Starting Bid ($)</Label>
+                    <Input
+                      id="startingBid"
+                      type="number"
+                      value={startingPrice}
+                      onChange={(e) => setStartingPrice(e.target.value)}
+                      placeholder="0"
+                      className="mt-1"
+                    />
                   </div>
                   <div>
                     <Label htmlFor="duration">Duration</Label>
                     <select
                       id="duration"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
                       className="w-full mt-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
                     >
-                      <option>1 day</option>
-                      <option>3 days</option>
-                      <option>5 days</option>
-                      <option>7 days</option>
+                      <option value="1">1 day</option>
+                      <option value="3">3 days</option>
+                      <option value="5">5 days</option>
+                      <option value="7">7 days</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <Label>Images</Label>
-                  <div className="mt-1 border-2 border-dashed border-border rounded-lg p-8 text-center">
-                    <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Drag & drop images or click to upload
-                    </p>
-                  </div>
+                  <Label>Image URL</Label>
+                  <Input
+                    id="image"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="mt-1"
+                  />
                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <Button variant="outline" className="flex-1" onClick={() => setShowCreateForm(false)}>
                     Cancel
                   </Button>
-                  <Button className="flex-1" onClick={() => setShowCreateForm(false)}>
-                    Create Auction
+                  <Button className="flex-1" onClick={handleCreateAuction} disabled={loading}>
+                    {loading ? "Creating..." : "Create Auction"}
                   </Button>
                 </div>
               </div>

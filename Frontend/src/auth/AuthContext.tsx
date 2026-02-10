@@ -1,95 +1,59 @@
 import * as React from "react";
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-};
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
-  token: string | null;
-  user: AuthUser | null;
+  session: Session | null;
+  user: User | null;
   isAuthenticated: boolean;
-  login: (params: { email: string; password: string }) => Promise<void>;
-  logout: () => void;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = React.createContext<AuthContextValue | undefined>(undefined);
 
-const STORAGE_TOKEN_KEY = "auth_token";
-const STORAGE_USER_KEY = "auth_user";
-
-function readStoredAuth() {
-  const token = localStorage.getItem(STORAGE_TOKEN_KEY);
-  const rawUser = localStorage.getItem(STORAGE_USER_KEY);
-
-  let user: AuthUser | null = null;
-  if (rawUser) {
-    try {
-      user = JSON.parse(rawUser) as AuthUser;
-    } catch {
-      user = null;
-    }
-  }
-
-  return {
-    token: token || null,
-    user,
-  };
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [{ token, user }, setAuth] = React.useState(() => readStoredAuth());
+  const [session, setSession] = React.useState<Session | null>(null);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
-  const login = React.useCallback(async ({ email, password }: { email: string; password: string }) => {
-    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-    const res = await fetch(`${baseUrl}/api/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
+  React.useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
-    if (!res.ok) {
-      let message = "Login failed";
-      try {
-        const data = (await res.json()) as { message?: string };
-        if (data?.message) message = data.message;
-      } catch {
-        // ignore
-      }
-      throw new Error(message);
-    }
+    // Listen for changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-    const data = (await res.json()) as {
-      token: string;
-      user: AuthUser;
-    };
-
-    localStorage.setItem(STORAGE_TOKEN_KEY, data.token);
-    localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
-
-    setAuth({ token: data.token, user: data.user });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const logout = React.useCallback(() => {
-    localStorage.removeItem(STORAGE_TOKEN_KEY);
-    localStorage.removeItem(STORAGE_USER_KEY);
-    setAuth({ token: null, user: null });
+  const signOut = React.useCallback(async () => {
+    await supabase.auth.signOut();
   }, []);
 
   const value = React.useMemo<AuthContextValue>(
     () => ({
-      token,
+      session,
       user,
-      isAuthenticated: Boolean(token),
-      login,
-      logout,
+      isAuthenticated: !!session,
+      signOut,
     }),
-    [token, user, login, logout],
+    [session, user, signOut]
   );
+
+  if (loading) {
+    // You might want a loading spinner here
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

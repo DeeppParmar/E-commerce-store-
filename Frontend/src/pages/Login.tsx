@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAuth } from "@/auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 type LocationState = {
   from?: {
@@ -15,12 +15,13 @@ type LocationState = {
 };
 
 export default function Login() {
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -31,23 +32,32 @@ export default function Login() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (!email || !password) {
-      setError("Please enter your email and password.");
-      return;
-    }
-
     setIsSubmitting(true);
+
     try {
-      await login({ email, password });
-      toast({
-        title: "Signed in",
-        description: "You are now logged in.",
-      });
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        toast({ title: "Welcome back!", description: "Signed in successfully" });
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
+          },
+        });
+        if (error) throw error;
+        toast({ title: "Account created!", description: "Check your email to verify account." });
+      }
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Login failed";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -58,18 +68,35 @@ export default function Login() {
       <div className="max-w-md mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Login</CardTitle>
-            <CardDescription>Sign in to your account to continue.</CardDescription>
+            <CardTitle>{isLogin ? "Login" : "Create Account"}</CardTitle>
+            <CardDescription>
+              {isLogin
+                ? "Sign in to your account to continue."
+                : "Enter your details to create a new account."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
               <Alert variant="destructive" className="mb-4">
-                <AlertTitle>Login failed</AlertTitle>
+                <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
             <form onSubmit={onSubmit} className="space-y-4">
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="John Doe"
+                    required
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -77,8 +104,8 @@ export default function Login() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
                   placeholder="you@example.com"
+                  required
                 />
               </div>
 
@@ -89,21 +116,28 @@ export default function Login() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
                   placeholder="••••••••"
+                  required
+                  minLength={6}
                 />
               </div>
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Signing in..." : "Sign in"}
+                {isSubmitting ? "Processing..." : isLogin ? "Sign in" : "Sign up"}
               </Button>
             </form>
 
-            <div className="mt-4 text-sm text-muted-foreground">
-              <span>Back to </span>
-              <Link to="/" className="text-foreground underline underline-offset-4">
-                Home
-              </Link>
+            <div className="mt-4 text-center text-sm">
+              <span className="text-muted-foreground">
+                {isLogin ? "Don't have an account? " : "Already have an account? "}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-primary hover:underline font-medium"
+              >
+                {isLogin ? "Sign up" : "Sign in"}
+              </button>
             </div>
           </CardContent>
         </Card>

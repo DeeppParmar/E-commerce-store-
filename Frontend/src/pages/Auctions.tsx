@@ -1,20 +1,61 @@
-import { useState } from "react";
-import { AuctionCard } from "@/components/auction/AuctionCard";
+import { useState, useEffect } from "react";
+import { AuctionCard, AuctionData } from "@/components/auction/AuctionCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { allAuctions, categories } from "@/data/mockData";
+import { categories } from "@/data/mockData"; // Keep categories for now
 import { Search, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+type BackendAuction = {
+  id: string;
+  title: string;
+  images: string[];
+  current_price: number;
+  end_time: string;
+  status: string;
+  bids: { id: string }[];
+};
 
 export default function Auctions() {
+  const [auctions, setAuctions] = useState<AuctionData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState("ending-soon");
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
-  const filteredAuctions = allAuctions
+  useEffect(() => {
+    const fetchAuctions = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const res = await fetch(`${baseUrl}/api/auctions`);
+        if (!res.ok) throw new Error("Failed to fetch auctions");
+        const data = await res.json();
+
+        const mapped: AuctionData[] = data.auctions.map((a: BackendAuction) => ({
+          id: a.id,
+          title: a.title,
+          image: a.images?.[0] || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&h=600&fit=crop", // Fallback
+          currentBid: a.current_price,
+          totalBids: a.bids?.length || 0,
+          endTime: new Date(a.end_time),
+          isLive: a.status === 'active',
+        }));
+        setAuctions(mapped);
+      } catch (error) {
+        toast({ title: "Error", description: "Could not load auctions", variant: "destructive" });
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAuctions();
+  }, [toast]);
+
+  const filteredAuctions = auctions
     .filter((auction) => {
       if (selectedCategory !== "All") {
-        // Simple category filter based on title keywords for demo
         return auction.title.toLowerCase().includes(selectedCategory.toLowerCase());
       }
       return true;
@@ -40,6 +81,10 @@ export default function Auctions() {
       }
     });
 
+  if (loading) {
+    return <div className="container py-12 text-center">Loading auctions...</div>;
+  }
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -47,7 +92,7 @@ export default function Auctions() {
         <div className="container py-8">
           <h1 className="text-3xl font-bold mb-2">Live Auctions</h1>
           <p className="text-muted-foreground">
-            Browse and bid on {allAuctions.length}+ live auctions
+            Browse and bid on {auctions.length}+ live auctions
           </p>
         </div>
       </div>

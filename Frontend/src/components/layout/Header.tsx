@@ -16,7 +16,7 @@ const navLinks = [
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, signOut } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
 
@@ -84,7 +84,7 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 className="hidden sm:inline-flex"
-                onClick={logout}
+                onClick={() => signOut()}
               >
                 <LogOut className="h-5 w-5" />
               </Button>
@@ -121,7 +121,7 @@ export function Header() {
               </span>
             )}
           </Button>
-          
+
           {/* Mobile Menu Toggle */}
           <Button
             variant="ghost"
@@ -172,7 +172,7 @@ export function Header() {
                 </Link>
                 <button
                   onClick={() => {
-                    logout();
+                    signOut();
                     setMobileMenuOpen(false);
                   }}
                   className="px-4 py-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left"

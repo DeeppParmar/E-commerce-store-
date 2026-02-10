@@ -1,9 +1,9 @@
 import { createApp } from "./app";
-import { connectDb } from "./config/db";
+// import { connectDb } from "./config/db";
 import { env } from "./config/env";
 
 async function main() {
-  await connectDb();
+  // await connectDb(); // MongoDB removed
 
   const app = createApp();
 

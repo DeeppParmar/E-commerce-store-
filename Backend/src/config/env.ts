@@ -28,10 +28,9 @@ if (!loadedFrom) {
 const envSchema = z.object({
   NODE_ENV: z.string().default("development"),
   PORT: z.coerce.number().int().positive().default(5000),
-  MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
-  JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
-  JWT_EXPIRES_IN: z.string().default("7d"),
-  CORS_ORIGIN: z.string().default("http://localhost:8080"),
+  CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  SUPABASE_URL: z.string().min(1, "SUPABASE_URL is required"),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
 });
 
 const parsed = envSchema.safeParse(process.env);

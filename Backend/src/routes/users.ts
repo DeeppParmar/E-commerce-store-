@@ -1,20 +1,10 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth";
-import { User } from "../models/User";
-import { HttpError } from "../utils/httpError";
+import { checkAuth } from "../middleware/checkAuth";
+import * as UserController from "../controllers/users";
 
 export const usersRouter = Router();
 
-usersRouter.get("/users/me", requireAuth, async (req, res, next) => {
-  try {
-    const id = req.user?.id;
-    if (!id) throw new HttpError(401, "Unauthorized");
-
-    const user = await User.findById(id);
-    if (!user) throw new HttpError(404, "User not found");
-
-    res.json({ user: user.toJSON() });
-  } catch (err) {
-    next(err);
-  }
-});
+usersRouter.get("/users/me", checkAuth, UserController.getMe);
+usersRouter.get("/users/bids", checkAuth, UserController.getMyBids);
+usersRouter.get("/users/wins", checkAuth, UserController.getMyWins);
+usersRouter.get("/users/auctions", checkAuth, UserController.getMyAuctions);
