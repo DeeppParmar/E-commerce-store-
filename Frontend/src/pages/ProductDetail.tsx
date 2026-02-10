@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { featuredProducts } from "@/data/mockData";
 import { Minus, Plus, Heart, Share2, Truck, Shield, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/context/CartContext";
 
 export default function ProductDetail() {
   const { id } = useParams();
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isCartAnimating, setIsCartAnimating] = useState(false);
+
+  const { addToCart } = useCart();
 
   const product = featuredProducts.find((p) => p.id === id) || featuredProducts[0];
 
@@ -23,6 +26,15 @@ export default function ProductDetail() {
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
 
   const triggerCartAnimation = () => {
+    // Add logic to add quantity times
+    for (let i = 0; i < quantity; i++) {
+      addToCart({
+        id: product.id,
+        title: product.title,
+        price: product.price,
+        image: product.image,
+      });
+    }
     setIsCartAnimating(true);
     window.setTimeout(() => setIsCartAnimating(false), 350);
   };
@@ -50,7 +62,7 @@ export default function ProductDetail() {
                 alt={product.title}
                 className="w-full h-full object-cover"
               />
-              
+
               {images.length > 1 && (
                 <>
                   <button
@@ -98,7 +110,7 @@ export default function ProductDetail() {
             <div>
               <p className="text-sm text-muted-foreground mb-2">{product.category}</p>
               <h1 className="text-2xl md:text-3xl font-bold mb-4">{product.title}</h1>
-              
+
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold">${product.price.toLocaleString()}</span>
                 {hasDiscount && (
@@ -174,9 +186,9 @@ export default function ProductDetail() {
             <div>
               <h3 className="font-semibold mb-3">Description</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Premium quality product crafted with attention to detail. 
-                Each item is carefully inspected to ensure it meets our high standards. 
-                Perfect for everyday use or as a thoughtful gift. 
+                Premium quality product crafted with attention to detail.
+                Each item is carefully inspected to ensure it meets our high standards.
+                Perfect for everyday use or as a thoughtful gift.
                 Backed by our satisfaction guarantee.
               </p>
             </div>

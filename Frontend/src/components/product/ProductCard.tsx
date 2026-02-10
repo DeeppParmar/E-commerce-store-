@@ -4,6 +4,8 @@ import { ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
+import { useCart } from "@/context/CartContext";
+
 export interface ProductData {
   id: string;
   title: string;
@@ -19,6 +21,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
+  const { addToCart } = useCart();
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
   const discountPercent = hasDiscount
     ? Math.round((1 - product.price / product.originalPrice!) * 100)
@@ -67,12 +70,19 @@ export function ProductCard({ product, className }: ProductCardProps) {
               </span>
             )}
           </div>
-          
+
           <Button
             variant="outline"
             size="icon"
             className={cn("h-9 w-9", isCartAnimating && "animate-cart-click")}
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              addToCart({
+                id: product.id,
+                title: product.title,
+                price: product.price,
+                image: product.image,
+              });
               setIsCartAnimating(true);
               window.setTimeout(() => setIsCartAnimating(false), 350);
             }}

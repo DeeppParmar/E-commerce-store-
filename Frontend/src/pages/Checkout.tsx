@@ -1,14 +1,17 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, CreditCard, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/context/CartContext";
+import { useToast } from "@/hooks/use-toast";
 
 type Step = "address" | "payment" | "confirmation";
 
 export default function Checkout() {
+  const { items: cartItems, subtotal, clearCart } = useCart();
   const [currentStep, setCurrentStep] = useState<Step>("address");
   const [formData, setFormData] = useState({
     email: "",
@@ -23,11 +26,24 @@ export default function Checkout() {
     cvc: "",
   });
 
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const shipping = subtotal > 500 ? 0 : 15;
+  const total = subtotal + shipping;
+
   const steps: { key: Step; label: string }[] = [
     { key: "address", label: "Shipping" },
     { key: "payment", label: "Payment" },
     { key: "confirmation", label: "Confirm" },
   ];
+
+  useEffect(() => {
+    if (cartItems.length === 0 && currentStep !== "confirmation") {
+      navigate("/cart");
+      toast({ title: "Cart is empty", description: "Please add items to checkout", variant: "destructive" });
+    }
+  }, [cartItems, currentStep, navigate, toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -35,8 +51,18 @@ export default function Checkout() {
 
   const handleContinue = () => {
     if (currentStep === "address") {
+      if (!formData.email || !formData.address || !formData.city || !formData.zipCode) {
+        toast({ title: "Missing Information", description: "Please fill in all shipping details", variant: "destructive" });
+        return;
+      }
       setCurrentStep("payment");
     } else if (currentStep === "payment") {
+      if (!formData.cardNumber || !formData.expiry || !formData.cvc) {
+        toast({ title: "Missing Payment Info", description: "Please fill in card details", variant: "destructive" });
+        return;
+      }
+      // Process order...
+      clearCart();
       setCurrentStep("confirmation");
     }
   };
@@ -49,7 +75,7 @@ export default function Checkout() {
         </div>
         <h1 className="text-2xl font-bold mb-4">Order Confirmed!</h1>
         <p className="text-muted-foreground mb-2">
-          Thank you for your purchase. Your order #12345 has been placed.
+          Thank you for your purchase. Your order #{Math.floor(Math.random() * 10000)} has been placed.
         </p>
         <p className="text-sm text-muted-foreground mb-8">
           You'll receive a confirmation email shortly.
@@ -82,8 +108,8 @@ export default function Checkout() {
                     currentStep === step.key
                       ? "bg-primary text-primary-foreground"
                       : steps.findIndex((s) => s.key === currentStep) > index
-                      ? "bg-success text-success-foreground"
-                      : "bg-secondary text-muted-foreground"
+                        ? "bg-success text-success-foreground"
+                        : "bg-secondary text-muted-foreground"
                   )}
                 >
                   {steps.findIndex((s) => s.key === currentStep) > index ? (
@@ -259,7 +285,7 @@ export default function Checkout() {
                     Back
                   </Button>
                   <Button variant="bid" size="lg" className="flex-1" onClick={handleContinue}>
-                    Place Order - $907
+                    Place Order - ${total.toLocaleString()}
                   </Button>
                 </div>
               </div>
@@ -272,44 +298,34 @@ export default function Checkout() {
               <h2 className="font-semibold text-lg">Order Summary</h2>
 
               <div className="space-y-3">
-                <div className="flex gap-3">
-                  <img
-                    src="https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=80&h=80&fit=crop"
-                    alt=""
-                    className="w-16 h-16 rounded-lg object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium line-clamp-1">Premium Leather Messenger Bag</p>
-                    <p className="text-sm text-muted-foreground">Qty: 1</p>
+                {cartItems.map((item) => (
+                  <div key={item.id} className="flex gap-3">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="w-16 h-16 rounded-lg object-cover"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium line-clamp-1">{item.title}</p>
+                      <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                    </div>
+                    <p className="font-medium">${(item.price * item.quantity).toLocaleString()}</p>
                   </div>
-                  <p className="font-medium">$249</p>
-                </div>
-                <div className="flex gap-3">
-                  <img
-                    src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=80&h=80&fit=crop"
-                    alt=""
-                    className="w-16 h-16 rounded-lg object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium line-clamp-1">Wireless Noise-Canceling Headphones</p>
-                    <p className="text-sm text-muted-foreground">Qty: 2</p>
-                  </div>
-                  <p className="font-medium">$658</p>
-                </div>
+                ))}
               </div>
 
               <div className="pt-4 border-t border-border space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>$907</span>
+                  <span>${subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span>Free</span>
+                  <span>{shipping === 0 ? "Free" : `$${shipping}`}</span>
                 </div>
                 <div className="flex justify-between text-lg font-semibold pt-2 border-t border-border">
                   <span>Total</span>
-                  <span>$907</span>
+                  <span>${total.toLocaleString()}</span>
                 </div>
               </div>
             </div>

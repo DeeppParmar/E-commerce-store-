@@ -68,8 +68,8 @@ export default function SellerDashboard() {
       setMyAuctions(auctions);
 
       // Calculate Stats
-      const soldItems = auctions.filter(a => a.status === 'ended' && a.winner_id);
-      const activeItems = auctions.filter(a => a.status === 'active');
+      const soldItems = auctions.filter(a => a.status === 'ended' || (a.status === 'active' && new Date(a.end_time) <= new Date()));
+      const activeItems = auctions.filter(a => a.status === 'active' && new Date(a.end_time) > new Date());
       const totalEarnings = soldItems.reduce((sum, item) => sum + Number(item.current_price), 0);
 
       setStats({
@@ -166,8 +166,8 @@ export default function SellerDashboard() {
   };
 
   const displayedAuctions = activeTab === 'overview'
-    ? myAuctions.filter(a => a.status === 'active')
-    : myAuctions.filter(a => a.status === 'ended');
+    ? myAuctions.filter(a => a.status === 'active' && new Date(a.end_time) > new Date())
+    : myAuctions.filter(a => a.status === 'ended' || new Date(a.end_time) <= new Date());
 
   return (
     <div className="animate-fade-in">

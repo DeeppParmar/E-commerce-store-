@@ -159,7 +159,6 @@ BEGIN
       updated_at = NOW()
   WHERE id = auction_id;
 
-  -- 6. Notification (Notify previous winner)
   IF auction_record.winner_id IS NOT NULL AND auction_record.winner_id != auth.uid() THEN
     INSERT INTO public.notifications (user_id, type, message, related_id)
     VALUES (auction_record.winner_id, 'outbid', 'You have been outbid on ' || auction_record.title, auction_id);
@@ -168,3 +167,18 @@ BEGIN
   RETURN json_build_object('success', true, 'new_price', bid_amount, 'new_end_time', new_end_time);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 7. Watchlist Table
+CREATE TABLE public.watchlist (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  auction_id UUID REFERENCES public.auctions(id) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(user_id, auction_id)
+);
+
+ALTER TABLE public.watchlist ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own watchlist" ON public.watchlist FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can add to their watchlist" ON public.watchlist FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can remove from their watchlist" ON public.watchlist FOR DELETE USING (auth.uid() = user_id);

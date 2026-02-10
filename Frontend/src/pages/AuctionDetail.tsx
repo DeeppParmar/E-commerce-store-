@@ -115,6 +115,62 @@ export default function AuctionDetail() {
     }
   };
 
+  // Watchlist & Share Logic
+  const [isWatching, setIsWatching] = useState(false);
+
+  useEffect(() => {
+    if (user && id) {
+      const checkWatchStatus = async () => {
+        const { data } = await supabase
+          .from("watchlist")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("auction_id", id)
+          .single();
+        setIsWatching(!!data);
+      };
+      checkWatchStatus();
+    }
+  }, [user, id]);
+
+  const handleToggleWatch = async () => {
+    if (!isAuthenticated || !user) {
+      toast({ title: "Login Required", description: "Please login to watch items", variant: "destructive" });
+      return;
+    }
+
+    try {
+      if (isWatching) {
+        const { error } = await supabase
+          .from("watchlist")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("auction_id", id);
+        if (error) throw error;
+        setIsWatching(false);
+        toast({ title: "Removed from Watchlist" });
+      } else {
+        const { error } = await supabase
+          .from("watchlist")
+          .insert({ user_id: user.id, auction_id: id });
+        if (error) throw error;
+        setIsWatching(true);
+        toast({ title: "Added to Watchlist" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Could not update watchlist", variant: "destructive" });
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast({ title: "Link Copied", description: "Auction link copied to clipboard!" });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to copy link", variant: "destructive" });
+    }
+  };
+
   if (loading) return <div className="container py-12 text-center animate-pulse">Loading auction details...</div>;
   if (!auction) return <div className="container py-12 text-center">Auction not found</div>;
 
@@ -223,12 +279,17 @@ export default function AuctionDetail() {
 
             {/* Actions */}
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1">
-                <Heart className="h-4 w-4" />
-                Watch
+              <Button
+                variant={isWatching ? "default" : "outline"}
+                className="flex-1"
+                onClick={handleToggleWatch}
+                disabled={loading}
+              >
+                <Heart className={cn("h-4 w-4 mr-2", isWatching && "fill-current")} />
+                {isWatching ? "Watching" : "Watch"}
               </Button>
-              <Button variant="outline" className="flex-1">
-                <Share2 className="h-4 w-4" />
+              <Button variant="outline" className="flex-1" onClick={handleShare}>
+                <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
             </div>

@@ -15,10 +15,10 @@ type LocationState = {
 };
 
 export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false); // UI state primarily
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,27 +35,57 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+      // 1. Attempt Login first
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (!signInError) {
         toast({ title: "Welcome back!", description: "Signed in successfully" });
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
-        if (error) throw error;
-        toast({ title: "Account created!", description: "Check your email to verify account." });
+        navigate(redirectTo, { replace: true });
+        return;
       }
-      navigate(redirectTo, { replace: true });
+
+      // 2. If Login Fails with "Invalid login credentials", it might be a new user (or wrong pass)
+      // Since we can't easily distinguish without potentially leaking info, we can try to Register ONLY if the user explicitly opted for it, OR
+      // we can try to register if the error suggests user doesn't exist (Supabase is vague here for security).
+      // However, the user REQUESTED "auto register".
+      // Let's try to SignUp if SignIn failed.
+      console.log("Sign in failed, attempting registration...", signInError.message);
+
+      // If we are already in "Registration Mode" (user provided name), just retry sign up
+      // If we are NOT, we might need the name. For now, let's try to sign up with just email/pass if allowed, or prompt for name.
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || email.split('@')[0], // Fallback name
+          },
+        },
+      });
+
+      if (signUpError) {
+        // If signUp fails too, it might be a wrong password for an EXISTING user
+        if (signUpError.message.includes("already registered")) {
+          throw new Error("Incorrect password for existing account.");
+        }
+        throw signUpError;
+      }
+
+      // If successful signup
+      if (signUpData.user) {
+        // Check if session is established (sometimes requires email confirmation)
+        if (signUpData.session) {
+          toast({ title: "Account created!", description: "Signed in successfully." });
+          navigate(redirectTo, { replace: true });
+        } else {
+          toast({ title: "Account created!", description: "Please check your email to confirm your account." });
+        }
+      }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -68,11 +98,9 @@ export default function Login() {
       <div className="max-w-md mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>{isLogin ? "Login" : "Create Account"}</CardTitle>
+            <CardTitle>Welcome</CardTitle>
             <CardDescription>
-              {isLogin
-                ? "Sign in to your account to continue."
-                : "Enter your details to create a new account."}
+              Sign in or create an account automatically.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -84,19 +112,6 @@ export default function Login() {
             )}
 
             <form onSubmit={onSubmit} className="space-y-4">
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
-              )}
-
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -122,23 +137,21 @@ export default function Login() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name (Optional for Login)</Label>
+                <Input
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="John Doe"
+                />
+                <p className="text-xs text-muted-foreground">Required if creating a new account</p>
+              </div>
+
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Processing..." : isLogin ? "Sign in" : "Sign up"}
+                {isSubmitting ? "Processing..." : "Continue"}
               </Button>
             </form>
-
-            <div className="mt-4 text-center text-sm">
-              <span className="text-muted-foreground">
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-primary hover:underline font-medium"
-              >
-                {isLogin ? "Sign up" : "Sign in"}
-              </button>
-            </div>
           </CardContent>
         </Card>
       </div>

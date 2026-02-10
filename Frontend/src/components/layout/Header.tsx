@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useCart } from "@/context/CartContext";
 import { ShoppingCart, User, Menu, X, Gavel, LogOut, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -14,6 +15,7 @@ const navLinks = [
 ];
 
 export function Header() {
+  const { cartCount } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { isAuthenticated, signOut } = useAuth();
@@ -27,49 +29,53 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container flex h-16 items-center justify-between">
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Gavel className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="hidden sm:inline">BidVault</span>
-        </Link>
+        <div className="flex items-center gap-8">
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2 font-semibold text-xl tracking-tight">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+              <Gavel className="h-5 w-5" />
+            </div>
+            <span className="hidden sm:inline">BidVault</span>
+          </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
-          {navLinks.map((link) => (
-            (() => {
-              const isActive =
-                link.href === "/"
-                  ? location.pathname === "/" || location.pathname === "/home"
-                  : location.pathname === link.href;
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-6">
+            {navLinks.map((link) => (
+              (() => {
+                const isActive =
+                  link.href === "/"
+                    ? location.pathname === "/" || location.pathname === "/home"
+                    : location.pathname === link.href;
 
-              return (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors stroke-hover",
-                    isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {link.label}
-                </Link>
-              );
-            })()
-          ))}
-        </nav>
+                return (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className={cn(
+                      "text-sm font-medium transition-colors hover:text-primary",
+                      isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })()
+            ))}
+          </nav>
+        </div>
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
           <Link to="/cart">
             <Button variant="ghost" size="icon" className="relative">
               <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium flex items-center justify-center text-primary-foreground">
-                3
-              </span>
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium flex items-center justify-center text-primary-foreground">
+                  {cartCount}
+                </span>
+              )}
             </Button>
           </Link>
 

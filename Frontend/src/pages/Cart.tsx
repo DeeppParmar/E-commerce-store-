@@ -4,43 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Minus, Plus, Trash2, ArrowRight } from "lucide-react";
 
-// Mock cart items
-const initialCartItems = [
-  {
-    id: "p1",
-    title: "Premium Leather Messenger Bag",
-    image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200&h=200&fit=crop",
-    price: 249,
-    quantity: 1,
-  },
-  {
-    id: "p2",
-    title: "Wireless Noise-Canceling Headphones",
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&h=200&fit=crop",
-    price: 329,
-    quantity: 2,
-  },
-];
+import { useCart } from "@/context/CartContext";
 
 export default function Cart() {
-  const [cartItems, setCartItems] = useState(initialCartItems);
+  const { items: cartItems, updateQuantity, removeFromCart, subtotal } = useCart();
   const [promoCode, setPromoCode] = useState("");
 
-  const updateQuantity = (id: string, delta: number) => {
-    setCartItems((items) =>
-      items.map((item) =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
-      )
-    );
-  };
-
-  const removeItem = (id: string) => {
-    setCartItems((items) => items.filter((item) => item.id !== id));
-  };
-
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 500 ? 0 : 15;
   const total = subtotal + shipping;
 
@@ -116,7 +85,7 @@ export default function Cart() {
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive"
-                      onClick={() => removeItem(item.id)}
+                      onClick={() => removeFromCart(item.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
