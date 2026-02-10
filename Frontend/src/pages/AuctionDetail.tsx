@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuctionRealtime } from "@/hooks/useAuctionRealtime";
 import { useAuth } from "@/auth/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 type AuctionDetailType = {
   id: string;
@@ -32,9 +33,6 @@ type AuctionDetailType = {
       avatar_url: string;
     };
   }[];
-  _count?: {
-    bids: number
-  }
 };
 
 export default function AuctionDetail() {
@@ -49,77 +47,71 @@ export default function AuctionDetail() {
   useAuctionRealtime({
     auctionId: id,
     onBid: (newBid) => {
-      setAuction((prev) => {
-        if (!prev) return null;
-        // Optimistically update price and add bid to list if we had user info, 
-        // but for now we might just re-fetch or manual update if we don't have bidder info in payload
-        // The payload usually only has raw table data.
-        // For simple UI update:
-        return {
-          ...prev,
-          current_price: newBid.amount,
-          bids: [
-            {
-              ...newBid,
-              bidder: { full_name: "New Bidder", avatar_url: "" } // Placeholder until re-fetch
-            },
-            ...prev.bids
-          ]
-        };
-      });
+      // In a real app we might fetch the bidder details, but for now we can just push
+      // or re-fetch. Re-fetching is safer to get the relation data.
+      // For optimistic UI we could just show "New Bidder"
+      fetchAuction();
     },
     onAuctionUpdate: (updatedAuction) => {
       setAuction((prev) => prev ? { ...prev, ...updatedAuction } : null);
     }
   });
 
+  const fetchAuction = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('auctions')
+        .select(`
+          *,
+          seller:profiles!seller_id(full_name, avatar_url),
+          bids (
+            id,
+            amount,
+            created_at,
+            bidder:profiles!bidder_id(full_name, avatar_url)
+          )
+        `)
+        .eq('id', id)
+        .order('amount', { foreignTable: 'bids', ascending: false })
+        .single();
+
+      if (error) throw error;
+      setAuction(data as any); // Type assertion needed due to complex join types
+    } catch (error) {
+      toast({ title: "Error", description: "Could not load auction details", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchAuction = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-        const res = await fetch(`${baseUrl}/api/auctions/${id}`);
-        if (!res.ok) throw new Error("Failed to fetch auction");
-        const data = await res.json();
-        setAuction(data.auction);
-      } catch (error) {
-        toast({ title: "Error", description: "Could not load auction details", variant: "destructive" });
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (id) fetchAuction();
+    fetchAuction();
   }, [id, toast]);
 
   const handlePlaceBid = async (amount: number) => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       toast({ title: "Login Required", description: "Please login to place a bid", variant: "destructive" });
       return;
     }
 
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const token = (await import("@/lib/supabase").then(m => m.supabase.auth.getSession())).data.session?.access_token;
+    if (auction && user.id === auction.seller_id) {
+      toast({ title: "Error", description: "You cannot bid on your own auction", variant: "destructive" });
+      return;
+    }
 
-      const res = await fetch(`${baseUrl}/api/bids`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          auctionId: id,
-          amount: amount
-        })
+    try {
+      const { data, error } = await supabase.rpc('place_bid', {
+        auction_id: id,
+        bid_amount: amount
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to place bid");
-      }
+      if (error) throw error;
 
       toast({ title: "Success", description: "Bid placed successfully!" });
+      fetchAuction(); // Refresh to see new state
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to place bid", variant: "destructive" });
     }
   };
 

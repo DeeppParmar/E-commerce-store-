@@ -6,16 +6,10 @@ import { categories } from "@/data/mockData"; // Keep categories for now
 import { Search, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { Database } from "@/types/supabase";
 
-type BackendAuction = {
-  id: string;
-  title: string;
-  images: string[];
-  current_price: number;
-  end_time: string;
-  status: string;
-  bids: { id: string }[];
-};
+type AuctionRow = Database['public']['Tables']['auctions']['Row'];
 
 export default function Auctions() {
   const [auctions, setAuctions] = useState<AuctionData[]>([]);
@@ -28,23 +22,36 @@ export default function Auctions() {
   useEffect(() => {
     const fetchAuctions = async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-        const res = await fetch(`${baseUrl}/api/auctions`);
-        if (!res.ok) throw new Error("Failed to fetch auctions");
-        const data = await res.json();
+        setLoading(true);
 
-        const mapped: AuctionData[] = data.auctions.map((a: BackendAuction) => ({
+        let query = supabase
+          .from('auctions')
+          .select(`
+            *,
+            bids (count)
+          `)
+          .eq('status', 'active');
+
+        // Apply filters if needed (e.g. category if added to DB)
+        // For now, we fetch active auctions
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        const mapped: AuctionData[] = (data || []).map((a: any) => ({
           id: a.id,
           title: a.title,
-          image: a.images?.[0] || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&h=600&fit=crop", // Fallback
+          image: a.images?.[0] || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&h=600&fit=crop",
           currentBid: a.current_price,
-          totalBids: a.bids?.length || 0,
+          totalBids: a.bids?.[0]?.count || 0, // Approx count if using separate query or simplify
           endTime: new Date(a.end_time),
           isLive: a.status === 'active',
         }));
+
         setAuctions(mapped);
-      } catch (error) {
-        toast({ title: "Error", description: "Could not load auctions", variant: "destructive" });
+      } catch (error: any) {
+        toast({ title: "Error", description: error.message || "Could not load auctions", variant: "destructive" });
         console.error(error);
       } finally {
         setLoading(false);
@@ -55,6 +62,7 @@ export default function Auctions() {
 
   const filteredAuctions = auctions
     .filter((auction) => {
+      // Client-side filtering for title/category as we fetched all active
       if (selectedCategory !== "All") {
         return auction.title.toLowerCase().includes(selectedCategory.toLowerCase());
       }

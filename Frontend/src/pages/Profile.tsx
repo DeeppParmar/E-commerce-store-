@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,29 +43,60 @@ export default function Profile() {
   const [wonAuctions, setWonAuctions] = useState<Win[]>([]);
   const [loading, setLoading] = useState(false);
 
+
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-        const token = (await import("@/lib/supabase").then(m => m.supabase.auth.getSession())).data.session?.access_token;
-        const headers = { "Authorization": `Bearer ${token}` };
-
-        if (!token) return;
+        if (!user) return;
 
         // Fetch Bids
-        const bidsRes = await fetch(`${baseUrl}/api/users/bids`, { headers });
-        if (bidsRes.ok) {
-          const data = await bidsRes.json();
-          setActiveBids(data.bids || []);
-        }
+        const { data: bidsData, error: bidsError } = await supabase
+          .from('bids')
+          .select(`
+            *,
+            auction:auctions (
+              id,
+              title,
+              images,
+              end_time,
+              status,
+              current_price
+            )
+          `)
+          .eq('bidder_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (bidsError) throw bidsError;
+
+        // Map data to match expected shape if necessary, or just cast
+        // Supabase returns nested objects, which matches our type definition if we align them.
+        // Our 'auction' type in Bid matches valid Supabase response structure roughly.
+        // We might need to handle array vs single object for relation. 
+        // In this case 'auction' is a single object (Many-to-One).
+
+        // Ensure type safety manually or via casting for now
+        const mappedBids: Bid[] = (bidsData || []).map((b: any) => ({
+          id: b.id,
+          amount: b.amount,
+          created_at: b.created_at,
+          auction: b.auction // Supabase returns single object for foreign key if configured correctly
+        }));
+
+        setActiveBids(mappedBids);
 
         // Fetch Wins
-        const winsRes = await fetch(`${baseUrl}/api/users/wins`, { headers });
-        if (winsRes.ok) {
-          const data = await winsRes.json();
-          setWonAuctions(data.wins || []);
-        }
+        const { data: winsData, error: winsError } = await supabase
+          .from('auctions')
+          .select('*')
+          .eq('winner_id', user.id)
+          .eq('status', 'ended')
+          .order('end_time', { ascending: false });
+
+        if (winsError) throw winsError;
+
+        setWonAuctions((winsData || []) as any);
 
       } catch (error) {
         console.error("Failed to fetch profile data", error);

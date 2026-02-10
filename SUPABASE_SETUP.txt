@@ -1,3 +1,39 @@
+Supabase Setup Guide for "Dumbo" (E-commerce-store-)
+======================================================
+This guide helps you set up your Supabase project from scratch.
+
+STEP 1: Create a Supabase Account & Project
+-------------------------------------------
+1. Go to https://supabase.com/ and click "Start your project".
+2. Sign up with GitHub (recommended) or email.
+3. Click "New Project".
+4. Choose your Organization (or create one).
+5. Enter a Name: "dumbo-store" (or similar).
+6. Set a Database Password (SAVE THIS PASSWORD! You will need it later).
+7. Select a Region close to you (e.g., Singapore, Frankfurt, US East).
+8. Click "Create new project".
+   - It will take a few minutes to provision the database.
+
+STEP 2: Get API Keys & URL
+--------------------------
+1. Once the project is ready, go to the project dashboard.
+2. Navigate to "Project Settings" (icon at the bottom of the left sidebar).
+3. Click on "API".
+4. Copy the "Project URL" -> This is your SUPABASE_URL.
+5. Copy the "anon" "public" key -> This is your SUPABASE_ANON_KEY (for Frontend).
+6. Copy the "service_role" "secret" key -> This is your SUPABASE_SERVICE_ROLE_KEY (for Backend).
+
+   > SAVE THESE KEYS! You will put them in your .env files.
+
+STEP 3: Set Up Database Tables (Run SQL)
+----------------------------------------
+1. On the left sidebar, click the "SQL Editor" icon (looks like a terminal `>_`).
+2. Click "New query".
+3. Copy and paste the ENTIRE SQL script below into the editor.
+4. Click "Run" (bottom right of the editor).
+
+--- COPY BELOW THIS LINE ---
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -85,7 +121,6 @@ CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR E
 CREATE TRIGGER update_auctions_updated_at BEFORE UPDATE ON public.auctions FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- TRIGGER: Automatic Profile Creation on Sign Up
--- (This assumes you will use Supabase Auth hooks or client-side creation, but a database trigger is safer)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -98,3 +133,26 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+--- END SQL SCRIPT ---
+
+STEP 4: Authentication Settings
+-------------------------------
+1. Go to "Authentication" -> "Providers" (left sidebar).
+2. "Email" should be enabled by default.
+3. Ensure "Confirm email" is disabled for development (optional, makes testing easier) or configure your SMTP settings if you want real email verification.
+   - To disable email confirmation: Go to Auth -> Providers -> Email -> Turn OFF "Confirm email".
+
+STEP 5: Connect to Your App
+---------------------------
+Now copy the keys you saved in Step 2 into your .env files:
+
+Backend/.env:
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+
+Frontend/.env:
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+
+You resolve "Done! Your backend and frontend are now connected to your new Supabase project."

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/auth/AuthContext";
 import { Link } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
 type Auction = {
   id: string;
@@ -47,36 +48,41 @@ export default function SellerDashboard() {
   const [duration, setDuration] = useState("1"); // days
   const [imageUrl, setImageUrl] = useState("https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&h=600&fit=crop");
 
+
+
+  // ... inside component
+
   const fetchAuctions = async () => {
+    if (!user) return;
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const token = (await import("@/lib/supabase").then(m => m.supabase.auth.getSession())).data.session?.access_token;
-      if (!token) return;
+      setLoading(true);
+      const { data: auctionsData, error } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('seller_id', user.id)
+        .order('created_at', { ascending: false });
 
-      // Fetch all my auctions
-      const res = await fetch(`${baseUrl}/api/users/auctions`, {
-        headers: { "Authorization": `Bearer ${token}` }
+      if (error) throw error;
+
+      const auctions: Auction[] = (auctionsData || []) as any;
+      setMyAuctions(auctions);
+
+      // Calculate Stats
+      const soldItems = auctions.filter(a => a.status === 'ended' && a.winner_id);
+      const activeItems = auctions.filter(a => a.status === 'active');
+      const totalEarnings = soldItems.reduce((sum, item) => sum + Number(item.current_price), 0);
+
+      setStats({
+        totalEarnings,
+        activeListings: activeItems.length,
+        totalSold: soldItems.length,
+        avgSalePrice: soldItems.length > 0 ? totalEarnings / soldItems.length : 0
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        const auctions: Auction[] = data.auctions || [];
-        setMyAuctions(auctions);
-
-        // Calculate Stats
-        const soldItems = auctions.filter(a => a.status === 'ended' && a.winner_id);
-        const activeItems = auctions.filter(a => a.status === 'active');
-        const totalEarnings = soldItems.reduce((sum, item) => sum + Number(item.current_price), 0);
-
-        setStats({
-          totalEarnings,
-          activeListings: activeItems.length,
-          totalSold: soldItems.length,
-          avgSalePrice: soldItems.length > 0 ? totalEarnings / soldItems.length : 0
-        });
-      }
     } catch (error) {
       console.error("Failed to fetch auctions", error);
+      toast({ title: "Error", description: "Could not load auctions", variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,6 +92,33 @@ export default function SellerDashboard() {
     }
   }, [user]);
 
+  // ... inside component
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      if (!e.target.files || e.target.files.length === 0) {
+        throw new Error('You must select an image to upload.');
+      }
+
+      const file = e.target.files[0];
+      const { uploadImage } = await import("@/lib/storage");
+      const publicUrl = await uploadImage(file);
+
+      if (publicUrl) {
+        setImageUrl(publicUrl);
+        toast({ title: "Success", description: "Image uploaded successfully" });
+      } else {
+        throw new Error("Upload failed");
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleCreateAuction = async () => {
     if (!title || !startingPrice || !imageUrl) {
       toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
@@ -94,29 +127,25 @@ export default function SellerDashboard() {
 
     setLoading(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
       // Calculate End Time
       const days = parseInt(duration);
       const endTime = new Date();
       endTime.setDate(endTime.getDate() + days);
 
-      const res = await fetch(`${baseUrl}/api/auctions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${(await import("@/lib/supabase").then(m => m.supabase.auth.getSession())).data.session?.access_token}`
-        },
-        body: JSON.stringify({
+      const { error } = await supabase
+        .from('auctions')
+        .insert({
+          seller_id: user?.id!,
           title,
           description,
-          startingPrice: parseFloat(startingPrice),
-          endTime: endTime.toISOString(),
-          images: [imageUrl]
-        })
-      });
+          starting_price: parseFloat(startingPrice),
+          current_price: parseFloat(startingPrice),
+          end_time: endTime.toISOString(),
+          status: 'active',
+          images: [imageUrl],
+        });
 
-      if (!res.ok) throw new Error("Failed to create auction");
+      if (error) throw error;
 
       toast({ title: "Success", description: "Auction created successfully!" });
       setShowCreateForm(false);
@@ -124,12 +153,13 @@ export default function SellerDashboard() {
       setTitle("");
       setDescription("");
       setStartingPrice("");
+      setImageUrl("");
 
       // Refresh list
       fetchAuctions();
 
-    } catch (error) {
-      toast({ title: "Error", description: "Could not create auction", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Could not create auction", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -332,13 +362,23 @@ export default function SellerDashboard() {
 
                 <div>
                   <Label>Image URL</Label>
-                  <Input
-                    id="image"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="mt-1"
-                  />
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploading}
+                      className="mt-1"
+                    />
+                    {uploading && <span className="text-sm text-muted-foreground">Uploading...</span>}
+                  </div>
+                  {imageUrl && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-1">Preview:</p>
+                      <img src={imageUrl} alt="Preview" className="w-20 h-20 object-cover rounded-md" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 pt-4">

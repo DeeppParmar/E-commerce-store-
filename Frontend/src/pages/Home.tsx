@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { Link } from "react-router-dom";
 import { ArrowRight, Gavel, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,18 +15,22 @@ export default function Home() {
   useEffect(() => {
     const fetchAuctions = async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-        const res = await fetch(`${baseUrl}/api/auctions?status=active`);
-        if (res.ok) {
-          const data = await res.json();
-          const auctions = data.auctions || [];
-          setLiveAuctions(auctions.slice(0, 4));
-          // For ending soon, we could sort on client or server. 
-          // Assuming server returns sorted by created_at, we might need another endpoint or sort here.
-          // Let's just use the same list sorted by end_time for now.
-          const sorted = [...auctions].sort((a: any, b: any) => new Date(a.end_time).getTime() - new Date(b.end_time).getTime());
-          setEndingSoonAuctions(sorted.slice(0, 3));
-        }
+        const { data: auctionsData, error } = await supabase
+          .from("auctions")
+          .select("*")
+          .eq("status", "active")
+          .order("end_time", { ascending: true })
+          .limit(10); // Fetch a few more to sort on client if needed
+
+        if (error) throw error;
+
+        const auctions = auctionsData || [];
+        setLiveAuctions(auctions.slice(0, 4));
+
+        // Sorting logic handled by query partially, but let's sync with original logic
+        const sorted = [...auctions].sort((a: any, b: any) => new Date(a.end_time).getTime() - new Date(b.end_time).getTime());
+        setEndingSoonAuctions(sorted.slice(0, 3));
+
       } catch (error) {
         console.error("Failed to fetch auctions", error);
       }
