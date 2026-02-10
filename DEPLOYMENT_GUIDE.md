@@ -1,77 +1,43 @@
-# Deployment Guide for "Dumbo" (E-commerce-store-)
+# Deployment Guide
 
-This guide explains how to deploy your full-stack application to the web.
+This guide covers deploying the **Frontend** to Vercel. Since we migrated to a Supabase-only architecture, there is no separate backend to deploy.
 
-## Overview
+## Prerequisites
 
-- **Frontend:** Deployed on **Netlify** (or Vercel).
-- **Backend:** Deployed on **Render** (or Railway/Heroku).
-- **Database:** Hosted on **Supabase**.
+1.  **GitHub Account**: Ensure your code is pushed to a GitHub repository.
+2.  **Vercel Account**: Sign up at [vercel.com](https://vercel.com).
+3.  **Supabase Project**: You need your `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
----
+## Deploying to Vercel
 
-## 1. Database Setup (Supabase)
+1.  **Login to Vercel**: Go to your dashboard.
+2.  **Add New Project**: Click **"Add New..."** -> **"Project"**.
+3.  **Import Git Repository**: Select your repository (`E-commerce-store-`).
+4.  **Configure Project**:
+    *   **Framework Preset**: Select **Vite**.
+    *   **Root Directory**: Click "Edit" and select **`Frontend`**.
+    *   **Build Command**: `vite build` (Default)
+    *   **Output Directory**: `dist` (Default)
+    *   **Install Command**: `npm install` (Default)
+5.  **Environment Variables**:
+    *   Expand the **"Environment Variables"** section.
+    *   Add the following variables (copy values from your `Frontend/.env` or Supabase dashboard):
+        *   `VITE_SUPABASE_URL`: Your Supabase Project URL.
+        *   `VITE_SUPABASE_ANON_KEY`: Your Supabase Anon/Public Key.
+    *   **Note**: `VITE_API_URL` is no longer needed as the backend has been removed.
+6.  **Deploy**: Click **"Deploy"**.
 
-Your database is already hosted on Supabase. Ensure you have your production credentials ready:
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY` (for Backend)
-- `SUPABASE_ANON_KEY` (for Frontend)
+## Post-Deployment Checks
 
-*Note: You might want to create a separate project in Supabase for production data vs development data.*
+1.  **Visit URL**: Open the deployed Vercel URL.
+2.  **Test Auth**: Try signing in/up.
+3.  **Test Routing**: Navigate to different pages (e.g., `/auctions`, `/profile`) and refresh the page to ensure SPA routing (via `vercel.json`) works.
+4.  **Supabase Auth Redirects**:
+    *   Go to your Supabase Dashboard -> **Authentication** -> **URL Configuration**.
+    *   Add your detailed Vercel URL (e.g., `https://your-project.vercel.app`) to **Site URL** and **Redirect URLs**.
 
----
+## Troubleshooting
 
-## 2. Backend Deployment (Render)
-
-We recommended **Render** for the backend because it offers a free tier for web services and is easy to set up with Node.js.
-
-1.  **Create a Render Account:** Go to [render.com](https://render.com/) and sign up.
-2.  **New Web Service:** Click "New +" and select "Web Service".
-3.  **Connect Repository:** Connect your GitHub account and select your `E-commerce-store-` repository.
-4.  **Configure Service:**
-    - **Name:** `dumbo-backend` (or your preferred name)
-    - **Region:** Choose one close to you (e.g., Singapore, Frankfurt).
-    - **Branch:** `main`
-    - **Root Directory:** `Backend` (Important!)
-    - **Runtime:** `Node`
-    - **Build Command:** `npm install && npm run build`
-    - **Start Command:** `npm start`
-5.  **Environment Variables:**
-    Scroll down to "Environment Variables" and add the following:
-    - `PORT`: `10000` (Render's default)
-    - `CORS_ORIGIN`: `https://your-frontend-domain.netlify.app` (You will update this after deploying the frontend)
-    - `SUPABASE_URL`: `your_supabase_url`
-    - `SUPABASE_SERVICE_ROLE_KEY`: `your_supabase_service_role_key`
-6.  **Create Web Service:** Click "Create Web Service".
-7.  **Copy Backend URL:** Once deployed, copy the URL (e.g., `https://dumbo-backend.onrender.com`).
-
----
-
-## 3. Frontend Deployment (Netlify)
-
-Since you already have a `netlify.toml` file, deployment on Netlify is straightforward.
-
-1.  **Create a Netlify Account:** Go to [netlify.com](https://netlify.com/) and sign up.
-2.  **Add New Site:** Click "Add new site" -> "Import an existing project".
-3.  **Connect GitHub:** Authorize GitHub and select your `E-commerce-store-` repository.
-4.  **Configure Build:**
-    - **Base directory:** `Frontend`
-    - **Build command:** `npm run build`
-    - **Publish directory:** `Frontend/dist`
-    *Note: Netlify should auto-detect these settings from your `netlify.toml` file.*
-5.  **Environment Variables:**
-    Click "Show advanced" -> "New Variable" (or go to Site Settings > Environment variables later) and add:
-    - `VITE_SUPABASE_URL`: `your_supabase_url`
-    - `VITE_SUPABASE_ANON_KEY`: `your_supabase_anon_key`
-    - `VITE_API_URL`: `https://dumbo-backend.onrender.com` (The URL from step 2)
-6.  **Deploy Site:** Click "Deploy site".
-7.  **Update Backend CORS:**
-    Once your frontend is live (e.g., `https://dumbo-store.netlify.app`), go back to your **Render Dashboard** -> **Environment Variables** and update `CORS_ORIGIN` to this new URL. Redeploy the backend if necessary.
-
----
-
-## 4. Final Checks
-
-1.  Visit your Netlify URL.
-2.  Check if products/auctions are loading (tests backend connection).
-3.  Try logging in (tests Supabase connection).
+-   **404 on Refresh**: Ensure `vercel.json` exists in `Frontend/` with the rewrite rule pointing to `/index.html`.
+-   **Auth Errors**: Verify `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are correct in Vercel settings.
+-   **Build Fails**: Check Vercel logs. Ensure all dependencies are in `Frontend/package.json`.

@@ -13,4 +13,4 @@ For instructions on how to deploy this application to production, please refer t
 ## Project Structure
 
 - **Frontend:** React + Vite + Tailwind CSS + Shadcn UI
-- **Backend:** Express + TypeScript + Supabase
+- **Backend:** Supabase (Auth, Database, Realtime, Storage)
