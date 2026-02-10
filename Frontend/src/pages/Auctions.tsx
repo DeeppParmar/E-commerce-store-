@@ -6,7 +6,7 @@ import { categories } from "@/data/mockData"; // Keep categories for now
 import { Search, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/api";
 import { Database } from "@/types/supabase";
 
 type AuctionRow = Database['public']['Tables']['auctions']['Row'];
@@ -24,27 +24,14 @@ export default function Auctions() {
       try {
         setLoading(true);
 
-        let query = supabase
-          .from('auctions')
-          .select(`
-            *,
-            bids (count)
-          `)
-          .eq('status', 'active');
-
-        // Apply filters if needed (e.g. category if added to DB)
-        // For now, we fetch active auctions
-
-        const { data, error } = await query;
-
-        if (error) throw error;
+        const { auctions: data } = await apiClient.getAuctions('active');
 
         const mapped: AuctionData[] = (data || []).map((a: any) => ({
           id: a.id,
           title: a.title,
           image: a.images?.[0] || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&h=600&fit=crop",
           currentBid: a.current_price,
-          totalBids: a.bids?.[0]?.count || 0, // Approx count if using separate query or simplify
+          totalBids: a.bid_count || 0,
           endTime: new Date(a.end_time),
           isLive: a.status === 'active',
         }));

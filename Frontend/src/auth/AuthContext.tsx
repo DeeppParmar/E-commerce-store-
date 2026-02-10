@@ -1,6 +1,6 @@
 import * as React from "react";
 import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/api";
 
 type AuthContextValue = {
   session: Session | null;
@@ -17,27 +17,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Check active session via API
+    apiClient.getSession().then(({ session, user }) => {
+      setSession(session as any); // API returns simplified session
+      setUser(user);
+      setLoading(false);
+    }).catch(() => {
+      setSession(null);
+      setUser(null);
       setLoading(false);
     });
-
-    // Listen for changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = React.useCallback(async () => {
-    await supabase.auth.signOut();
+    await apiClient.logout();
+    setSession(null);
+    setUser(null);
   }, []);
 
   const value = React.useMemo<AuthContextValue>(
@@ -65,3 +60,4 @@ export function useAuth() {
   }
   return ctx;
 }
+

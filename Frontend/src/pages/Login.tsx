@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/api";
 
 type LocationState = {
   from?: {
@@ -18,7 +18,6 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false); // UI state primarily
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,56 +34,15 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      // 1. Attempt Login first
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const data = await apiClient.login(email, password, fullName);
+
+      toast({
+        title: data.message.includes('created') ? 'Account Created!' : 'Welcome back!',
+        description: data.message
       });
 
-      if (!signInError) {
-        toast({ title: "Welcome back!", description: "Signed in successfully" });
-        navigate(redirectTo, { replace: true });
-        return;
-      }
-
-      // 2. If Login Fails with "Invalid login credentials", it might be a new user (or wrong pass)
-      // Since we can't easily distinguish without potentially leaking info, we can try to Register ONLY if the user explicitly opted for it, OR
-      // we can try to register if the error suggests user doesn't exist (Supabase is vague here for security).
-      // However, the user REQUESTED "auto register".
-      // Let's try to SignUp if SignIn failed.
-      console.log("Sign in failed, attempting registration...", signInError.message);
-
-      // If we are already in "Registration Mode" (user provided name), just retry sign up
-      // If we are NOT, we might need the name. For now, let's try to sign up with just email/pass if allowed, or prompt for name.
-
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName || email.split('@')[0], // Fallback name
-          },
-        },
-      });
-
-      if (signUpError) {
-        // If signUp fails too, it might be a wrong password for an EXISTING user
-        if (signUpError.message.includes("already registered")) {
-          throw new Error("Incorrect password for existing account.");
-        }
-        throw signUpError;
-      }
-
-      // If successful signup
-      if (signUpData.user) {
-        // Check if session is established (sometimes requires email confirmation)
-        if (signUpData.session) {
-          toast({ title: "Account created!", description: "Signed in successfully." });
-          navigate(redirectTo, { replace: true });
-        } else {
-          toast({ title: "Account created!", description: "Please check your email to confirm your account." });
-        }
-      }
+      // Reload to refresh auth context
+      window.location.href = redirectTo;
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
