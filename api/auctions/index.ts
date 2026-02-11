@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('auctions')
             .select(`
         *,
-        profiles:seller_id (
+        seller:profiles!seller_id (
           id,
           email,
           full_name,
