@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
+import { Gavel, Loader2 } from "lucide-react";
 
 type LocationState = {
   from?: {
@@ -41,7 +42,6 @@ export default function Login() {
         description: data.message
       });
 
-      // Reload to refresh auth context
       window.location.href = redirectTo;
 
     } catch (err) {
@@ -52,18 +52,21 @@ export default function Login() {
   };
 
   return (
-    <div className="container py-12">
-      <div className="max-w-md mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>Welcome</CardTitle>
-            <CardDescription>
-              Sign in or create an account automatically.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+    <div className="container flex items-center justify-center min-h-[calc(100vh-10rem)] py-12">
+      <div className="w-full max-w-md animate-scale-in">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 mb-4">
+            <Gavel className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl font-bold">Welcome to BidVault</h1>
+          <p className="text-muted-foreground mt-1">Sign in or create an account</p>
+        </div>
+
+        <Card className="border-border/50">
+          <CardContent className="pt-6">
             {error && (
-              <Alert variant="destructive" className="mb-4">
+              <Alert variant="destructive" className="mb-4 animate-fade-in">
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -79,6 +82,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
+                  autoComplete="email"
                 />
               </div>
 
@@ -92,26 +96,38 @@ export default function Login() {
                   placeholder="••••••••"
                   required
                   minLength={6}
+                  autoComplete="current-password"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name (Optional for Login)</Label>
+                <Label htmlFor="fullName">Full Name <span className="text-muted-foreground font-normal">(for new accounts)</span></Label>
                 <Input
                   id="fullName"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="John Doe"
+                  autoComplete="name"
                 />
-                <p className="text-xs text-muted-foreground">Required if creating a new account</p>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Processing..." : "Continue"}
+              <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Continue"
+                )}
               </Button>
             </form>
           </CardContent>
         </Card>
+
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          By continuing, you agree to our Terms of Service and Privacy Policy.
+        </p>
       </div>
     </div>
   );

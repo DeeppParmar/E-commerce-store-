@@ -1,10 +1,18 @@
 import { useState } from "react";
 import { ProductCard } from "@/components/product/ProductCard";
-import { Button } from "@/components/ui/button";
+import { ProductCardSkeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { featuredProducts, productCategories } from "@/data/mockData";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, PackageSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Shop() {
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -35,14 +43,14 @@ export default function Shop() {
         case "price-low":
           return a.price - b.price;
         case "newest":
-          return 0; // Would use date field
+          return 0;
         default:
           return 0;
       }
     });
 
   return (
-    <div className="animate-fade-in">
+    <div>
       {/* Header */}
       <div className="bg-card border-b border-border">
         <div className="container py-8">
@@ -59,16 +67,16 @@ export default function Shop() {
           <aside className="lg:w-64 space-y-6">
             {/* Categories */}
             <div>
-              <h3 className="font-medium mb-3">Categories</h3>
+              <h3 className="font-medium mb-3 text-sm uppercase tracking-wider text-foreground/80">Categories</h3>
               <div className="space-y-1">
                 {productCategories.map((category) => (
                   <button
                     key={category}
                     onClick={() => setSelectedCategory(category)}
                     className={cn(
-                      "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
+                      "w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
                       selectedCategory === category
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     )}
                   >
@@ -80,20 +88,20 @@ export default function Shop() {
 
             {/* Price Range */}
             <div>
-              <h3 className="font-medium mb-3">Price Range</h3>
+              <h3 className="font-medium mb-3 text-sm uppercase tracking-wider text-foreground/80">Price Range</h3>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
                   placeholder="Min"
-                  value={priceRange.min}
+                  value={priceRange.min || ""}
                   onChange={(e) => setPriceRange({ ...priceRange, min: Number(e.target.value) })}
                   className="w-full"
                 />
-                <span className="text-muted-foreground">-</span>
+                <span className="text-muted-foreground shrink-0">—</span>
                 <Input
                   type="number"
                   placeholder="Max"
-                  value={priceRange.max}
+                  value={priceRange.max || ""}
                   onChange={(e) => setPriceRange({ ...priceRange, max: Number(e.target.value) })}
                   className="w-full"
                 />
@@ -114,19 +122,17 @@ export default function Shop() {
                   className="pl-10"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-accent/50 border-0 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                >
-                  <option value="featured">Featured</option>
-                  <option value="newest">Newest</option>
-                  <option value="price-high">Price: High to Low</option>
-                  <option value="price-low">Price: Low to High</option>
-                </select>
-              </div>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="featured">Featured</SelectItem>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="price-high">Price: High to Low</SelectItem>
+                  <SelectItem value="price-low">Price: Low to High</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Mobile Categories */}
@@ -137,6 +143,10 @@ export default function Shop() {
                   variant={selectedCategory === category ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedCategory(category)}
+                  className={cn(
+                    "transition-all duration-200",
+                    selectedCategory === category && "shadow-sm shadow-primary/20"
+                  )}
                 >
                   {category}
                 </Button>
@@ -145,19 +155,26 @@ export default function Shop() {
 
             {/* Results Count */}
             <p className="text-sm text-muted-foreground mb-6">
-              Showing {filteredProducts.length} products
+              Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""}
             </p>
 
             {/* Product Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+              {filteredProducts.map((product, i) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  className="stagger-item"
+                  style={{ "--stagger-index": i } as React.CSSProperties}
+                />
               ))}
             </div>
 
             {filteredProducts.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No products found matching your criteria.</p>
+              <div className="text-center py-16">
+                <PackageSearch className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+                <p className="text-lg font-medium text-muted-foreground mb-1">No products found</p>
+                <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria.</p>
               </div>
             )}
           </div>

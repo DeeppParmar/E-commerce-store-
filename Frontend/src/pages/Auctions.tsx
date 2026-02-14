@@ -1,13 +1,21 @@
 import { useState, useEffect } from "react";
 import { AuctionCard, AuctionData } from "@/components/auction/AuctionCard";
-import { Button } from "@/components/ui/button";
+import { AuctionCardSkeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { categories } from "@/data/mockData"; // Keep categories for now
-import { Search, SlidersHorizontal } from "lucide-react";
+import { categories } from "@/data/mockData";
+import { Search, PackageSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
 import { Database } from "@/types/supabase";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 type AuctionRow = Database['public']['Tables']['auctions']['Row'];
 
@@ -49,7 +57,6 @@ export default function Auctions() {
 
   const filteredAuctions = auctions
     .filter((auction) => {
-      // Client-side filtering for title/category as we fetched all active
       if (selectedCategory !== "All") {
         return auction.title.toLowerCase().includes(selectedCategory.toLowerCase());
       }
@@ -76,12 +83,8 @@ export default function Auctions() {
       }
     });
 
-  if (loading) {
-    return <div className="container py-12 text-center">Loading auctions...</div>;
-  }
-
   return (
-    <div className="animate-fade-in">
+    <div>
       {/* Header */}
       <div className="bg-card border-b border-border">
         <div className="container py-8">
@@ -107,19 +110,17 @@ export default function Auctions() {
           </div>
 
           {/* Sort */}
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-accent/50 border-0 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-            >
-              <option value="ending-soon">Ending Soon</option>
-              <option value="price-high">Price: High to Low</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="most-bids">Most Bids</option>
-            </select>
-          </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ending-soon">Ending Soon</SelectItem>
+              <SelectItem value="price-high">Price: High to Low</SelectItem>
+              <SelectItem value="price-low">Price: Low to High</SelectItem>
+              <SelectItem value="most-bids">Most Bids</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Categories */}
@@ -131,7 +132,8 @@ export default function Auctions() {
               size="sm"
               onClick={() => setSelectedCategory(category)}
               className={cn(
-                selectedCategory === category && "bg-primary text-primary-foreground"
+                "transition-all duration-200",
+                selectedCategory === category && "bg-primary text-primary-foreground shadow-md shadow-primary/20"
               )}
             >
               {category}
@@ -140,20 +142,35 @@ export default function Auctions() {
         </div>
 
         {/* Results Count */}
-        <p className="text-sm text-muted-foreground mb-6">
-          Showing {filteredAuctions.length} auctions
-        </p>
+        {!loading && (
+          <p className="text-sm text-muted-foreground mb-6">
+            Showing {filteredAuctions.length} auction{filteredAuctions.length !== 1 ? "s" : ""}
+          </p>
+        )}
 
         {/* Auction Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredAuctions.map((auction) => (
-            <AuctionCard key={auction.id} auction={auction} />
-          ))}
+          {loading ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <AuctionCardSkeleton key={i} />
+            ))
+          ) : (
+            filteredAuctions.map((auction, i) => (
+              <AuctionCard
+                key={auction.id}
+                auction={auction}
+                className="stagger-item"
+                style={{ "--stagger-index": i } as React.CSSProperties}
+              />
+            ))
+          )}
         </div>
 
-        {filteredAuctions.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No auctions found matching your criteria.</p>
+        {!loading && filteredAuctions.length === 0 && (
+          <div className="text-center py-16">
+            <PackageSearch className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+            <p className="text-lg font-medium text-muted-foreground mb-1">No auctions found</p>
+            <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria.</p>
           </div>
         )}
       </div>
