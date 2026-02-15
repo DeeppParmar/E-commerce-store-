@@ -26,6 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
         if (userError || !user) return res.status(401).json({ error: 'Invalid token' });
 
+        // GET — list notifications
         if (req.method === 'GET') {
             const limit = parseInt(req.query.limit as string) || 20;
             const offset = parseInt(req.query.offset as string) || 0;
@@ -43,9 +44,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
 
+        // PUT — mark as read (single or all)
         if (req.method === 'PUT') {
-            const { notification_id } = req.body;
+            const action = req.query.action as string;
 
+            // Mark ALL as read
+            if (action === 'read-all') {
+                const { error } = await supabase
+                    .from('notifications')
+                    .update({ is_read: true })
+                    .eq('user_id', user.id)
+                    .eq('is_read', false);
+
+                if (error) throw error;
+                return res.status(200).json({ success: true });
+            }
+
+            // Mark SINGLE as read
+            const { notification_id } = req.body;
             if (!notification_id) {
                 return res.status(400).json({ error: 'notification_id is required' });
             }
@@ -57,7 +73,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .eq('user_id', user.id);
 
             if (error) throw error;
-
             return res.status(200).json({ success: true });
         }
 

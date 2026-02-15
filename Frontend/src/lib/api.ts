@@ -158,20 +158,20 @@ class ApiClient {
         return this.request<{ profile: any }>('/api/profile/me');
     }
 
-    // Dashboard endpoints
+    // Dashboard endpoints (consolidated into single function)
     async getDashboardSummary() {
-        return this.request<{ summary: any }>('/api/dashboard/summary');
+        return this.request<{ summary: any }>('/api/dashboard/index?type=summary');
     }
 
     async getActiveBids() {
-        return this.request<{ bids: any[] }>('/api/dashboard/active-bids');
+        return this.request<{ bids: any[] }>('/api/dashboard/index?type=active-bids');
     }
 
     async getWonAuctions() {
-        return this.request<{ won_auctions: any[] }>('/api/dashboard/won-auctions');
+        return this.request<{ won_auctions: any[] }>('/api/dashboard/index?type=won');
     }
 
-    // Notifications endpoints
+    // Notifications endpoints (consolidated into single function)
     async getNotifications(limit = 20, offset = 0) {
         return this.request<{ notifications: any[]; total: number }>(
             `/api/notifications/index?limit=${limit}&offset=${offset}`
@@ -186,7 +186,7 @@ class ApiClient {
     }
 
     async markAllNotificationsRead() {
-        return this.request<{ success: boolean }>('/api/notifications/read-all', {
+        return this.request<{ success: boolean }>('/api/notifications/index?action=read-all', {
             method: 'PUT',
         });
     }
