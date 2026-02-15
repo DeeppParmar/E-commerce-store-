@@ -27,7 +27,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const token = authHeader.substring(7);
-        const { title, description, images, starting_price, end_time } = req.body;
+        const {
+            title, description, images, starting_price, end_time,
+            category, condition, min_increment, tags,
+            shipping_cost, seller_location, local_pickup,
+            reserve_price, buy_now_price
+        } = req.body;
 
         if (!title || !starting_price || !end_time) {
             return res.status(400).json({ error: 'Title, starting price, and end time are required' });
@@ -47,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'Invalid token' });
         }
 
-        // Create auction
+        // Create auction with all fields
         const { data: auction, error: auctionError } = await supabase
             .from('auctions')
             .insert({
@@ -58,7 +63,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 starting_price,
                 current_price: starting_price,
                 end_time,
-                status: 'active'
+                status: 'active',
+                category: category || 'Other',
+                condition: condition || 'good',
+                min_increment: min_increment || 10,
+                tags: tags || [],
+                shipping_cost: shipping_cost || 0,
+                seller_location: seller_location || null,
+                local_pickup: local_pickup || false,
+                reserve_price: reserve_price || null,
+                buy_now_price: buy_now_price || null,
+                thumbnail_url: images?.[0] || null
             })
             .select()
             .single();

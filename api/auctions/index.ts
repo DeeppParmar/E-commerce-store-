@@ -20,7 +20,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const { status = 'active' } = req.query;
+        const {
+            status = 'active',
+            category,
+            condition,
+            search,
+            sort = 'ending-soon',
+            min_price,
+            max_price,
+            limit: limitParam
+        } = req.query;
 
         const supabase = createClient(supabaseUrl, supabaseServiceKey, {
             auth: {
@@ -29,20 +38,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        // Fetch auctions with bid count
-        const { data: auctions, error: auctionsError } = await supabase
+        // Build query with filters
+        let query = supabase
             .from('auctions')
             .select(`
-        *,
-        seller:profiles!seller_id (
-          id,
-          email,
-          full_name,
-          avatar_url
-        )
-      `)
-            .eq('status', status)
-            .order('end_time', { ascending: true });
+                *,
+                seller:profiles!seller_id (
+                    id,
+                    email,
+                    full_name,
+                    avatar_url
+                )
+            `)
+            .eq('status', status as string);
+
+        // Category filter
+        if (category && category !== 'All') {
+            query = query.eq('category', category as string);
+        }
+
+        // Condition filter
+        if (condition && condition !== 'all') {
+            query = query.eq('condition', condition as string);
+        }
+
+        // Price range
+        if (min_price) {
+            query = query.gte('current_price', parseFloat(min_price as string));
+        }
+        if (max_price) {
+            query = query.lte('current_price', parseFloat(max_price as string));
+        }
+
+        // Search (title matching)
+        if (search) {
+            query = query.ilike('title', `%${search}%`);
+        }
+
+        // Sorting
+        switch (sort) {
+            case 'price-high':
+                query = query.order('current_price', { ascending: false });
+                break;
+            case 'price-low':
+                query = query.order('current_price', { ascending: true });
+                break;
+            case 'newest':
+                query = query.order('created_at', { ascending: false });
+                break;
+            case 'ending-soon':
+            default:
+                query = query.order('end_time', { ascending: true });
+                break;
+        }
+
+        // Limit
+        if (limitParam) {
+            query = query.limit(parseInt(limitParam as string));
+        }
+
+        const { data: auctions, error: auctionsError } = await query;
 
         if (auctionsError) {
             throw auctionsError;

@@ -91,9 +91,28 @@ class ApiClient {
     }
 
     // Auctions endpoints
-    async getAuctions(status: string = 'active') {
+    async getAuctions(params: {
+        status?: string;
+        category?: string;
+        condition?: string;
+        search?: string;
+        sort?: string;
+        min_price?: number;
+        max_price?: number;
+        limit?: number;
+    } = {}) {
+        const searchParams = new URLSearchParams();
+        searchParams.set('status', params.status || 'active');
+        if (params.category && params.category !== 'All') searchParams.set('category', params.category);
+        if (params.condition && params.condition !== 'all') searchParams.set('condition', params.condition);
+        if (params.search) searchParams.set('search', params.search);
+        if (params.sort) searchParams.set('sort', params.sort);
+        if (params.min_price !== undefined) searchParams.set('min_price', String(params.min_price));
+        if (params.max_price !== undefined) searchParams.set('max_price', String(params.max_price));
+        if (params.limit) searchParams.set('limit', String(params.limit));
+
         return this.request<{ auctions: any[] }>(
-            `/api/auctions/index?status=${status}`
+            `/api/auctions/index?${searchParams.toString()}`
         );
     }
 
@@ -107,6 +126,15 @@ class ApiClient {
         images?: string[];
         starting_price: number;
         end_time: string;
+        category?: string;
+        condition?: string;
+        min_increment?: number;
+        tags?: string[];
+        shipping_cost?: number;
+        seller_location?: string;
+        local_pickup?: boolean;
+        reserve_price?: number;
+        buy_now_price?: number;
     }) {
         return this.request<{ auction: any; message: string }>(
             '/api/auctions/create',
@@ -128,6 +156,39 @@ class ApiClient {
     // Profile endpoints
     async getProfile() {
         return this.request<{ profile: any }>('/api/profile/me');
+    }
+
+    // Dashboard endpoints
+    async getDashboardSummary() {
+        return this.request<{ summary: any }>('/api/dashboard/summary');
+    }
+
+    async getActiveBids() {
+        return this.request<{ bids: any[] }>('/api/dashboard/active-bids');
+    }
+
+    async getWonAuctions() {
+        return this.request<{ won_auctions: any[] }>('/api/dashboard/won-auctions');
+    }
+
+    // Notifications endpoints
+    async getNotifications(limit = 20, offset = 0) {
+        return this.request<{ notifications: any[]; total: number }>(
+            `/api/notifications/index?limit=${limit}&offset=${offset}`
+        );
+    }
+
+    async markNotificationRead(notification_id: string) {
+        return this.request<{ success: boolean }>('/api/notifications/index', {
+            method: 'PUT',
+            body: JSON.stringify({ notification_id }),
+        });
+    }
+
+    async markAllNotificationsRead() {
+        return this.request<{ success: boolean }>('/api/notifications/read-all', {
+            method: 'PUT',
+        });
     }
 }
 

@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/auth/AuthContext";
 import { useTheme } from "next-themes";
+import { NotificationBell } from "./NotificationBell";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -115,6 +116,7 @@ export function Header() {
 
           {isAuthenticated ? (
             <>
+              <NotificationBell />
               <Link to="/profile" className="hidden sm:block">
                 <Button variant="ghost" size="icon">
                   <User className="h-5 w-5" />

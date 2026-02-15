@@ -1,329 +1,526 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/auth/AuthContext";
+import { apiClient } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
-  User, Settings, Wallet, Package, Gavel, Trophy,
-  ChevronRight, Edit, LogOut
+  Gavel, Trophy, TrendingUp, DollarSign, Eye, Clock,
+  ArrowUpRight, ArrowDownRight, Star, Settings, User,
+  ShoppingBag, BarChart3, Heart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/auth/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
 
-type Bid = {
+interface DashboardSummary {
+  active_bids: number;
+  my_auctions: number;
+  currently_winning: number;
+  auctions_won: number;
+  total_spent: number;
+  total_earned: number;
+  watchlist_count: number;
+  unread_notifications: number;
+}
+
+interface ActiveBid {
+  auction_id: string;
+  title: string;
+  image: string | null;
+  current_price: number;
+  my_highest_bid: number;
+  end_time: string;
+  status: string;
+  is_winning: boolean;
+  bid_count: number;
+}
+
+interface WonAuction {
   id: string;
-  amount: number;
+  winning_bid: number;
   created_at: string;
+  payment_status: string;
+  shipped: boolean;
   auction: {
     id: string;
     title: string;
     images: string[];
-    end_time: string;
-    status: string;
-    current_price: number;
+    description: string;
   };
-};
+}
 
-type Win = {
-  id: string;
-  title: string;
-  images: string[];
-  current_price: number; // final price
-  end_time: string;
-  status: string;
-};
+interface ProfileData {
+  full_name: string;
+  email: string;
+  avatar_url: string;
+  username?: string;
+  bio?: string;
+  location?: string;
+}
 
 export default function Profile() {
-  const [activeTab, setActiveTab] = useState("bids");
-  const { user, signOut } = useAuth();
+  const { user, isAuthenticated, signOut } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [activeBids, setActiveBids] = useState<Bid[]>([]);
-  const [wonAuctions, setWonAuctions] = useState<Win[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [activeBids, setActiveBids] = useState<ActiveBid[]>([]);
+  const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
-
+  // Edit profile state
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        if (!user) return;
-
-        // Fetch Bids
-        const { data: bidsData, error: bidsError } = await supabase
-          .from('bids')
-          .select(`
-            *,
-            auction:auctions (
-              id,
-              title,
-              images,
-              end_time,
-              status,
-              current_price
-            )
-          `)
-          .eq('bidder_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (bidsError) throw bidsError;
-
-        // Map data to match expected shape if necessary, or just cast
-        // Supabase returns nested objects, which matches our type definition if we align them.
-        // Our 'auction' type in Bid matches valid Supabase response structure roughly.
-        // We might need to handle array vs single object for relation. 
-        // In this case 'auction' is a single object (Many-to-One).
-
-        // Ensure type safety manually or via casting for now
-        const mappedBids: Bid[] = (bidsData || []).map((b: any) => ({
-          id: b.id,
-          amount: b.amount,
-          created_at: b.created_at,
-          auction: b.auction // Supabase returns single object for foreign key if configured correctly
-        }));
-
-        setActiveBids(mappedBids);
-
-        // Fetch Wins
-        const { data: winsData, error: winsError } = await supabase
-          .from('auctions')
-          .select('*')
-          .eq('winner_id', user.id)
-          .eq('status', 'ended')
-          .order('end_time', { ascending: false });
-
-        if (winsError) throw winsError;
-
-        setWonAuctions((winsData || []) as any);
-
-      } catch (error) {
-        console.error("Failed to fetch profile data", error);
-        toast({ title: "Error", description: "Could not load profile data", variant: "destructive" });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchData();
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
     }
-  }, [user, toast]);
+    fetchData();
+  }, [isAuthenticated, navigate]);
+
+  async function fetchData() {
+    setLoading(true);
+    try {
+      const [summaryRes, bidsRes, wonRes, profileRes] = await Promise.allSettled([
+        apiClient.getDashboardSummary(),
+        apiClient.getActiveBids(),
+        apiClient.getWonAuctions(),
+        apiClient.getProfile(),
+      ]);
+
+      if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.summary);
+      if (bidsRes.status === "fulfilled") setActiveBids(bidsRes.value.bids);
+      if (wonRes.status === "fulfilled") setWonAuctions(wonRes.value.won_auctions);
+      if (profileRes.status === "fulfilled") {
+        setProfile(profileRes.value.profile);
+        setEditName(profileRes.value.profile?.full_name || "");
+      }
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const summaryCards = [
+    {
+      title: "Active Bids",
+      value: summary?.active_bids || 0,
+      icon: Gavel,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    {
+      title: "Currently Winning",
+      value: summary?.currently_winning || 0,
+      icon: TrendingUp,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+    },
+    {
+      title: "Auctions Won",
+      value: summary?.auctions_won || 0,
+      icon: Trophy,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+    },
+    {
+      title: "Total Spent",
+      value: `$${(summary?.total_spent || 0).toLocaleString()}`,
+      icon: DollarSign,
+      color: "text-violet-500",
+      bg: "bg-violet-500/10",
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="container py-10 space-y-8 page-transition">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-16 w-16 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
+    );
+  }
 
   return (
-    <div className="animate-fade-in">
-      {/* Header */}
-      <div className="bg-card border-b border-border">
-        <div className="container py-8">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-              <User className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">{user?.user_metadata?.full_name || "User"}</h1>
-              <p className="text-muted-foreground">{user?.email}</p>
-            </div>
-            <Button variant="outline" size="sm">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Profile
-            </Button>
+    <div className="container py-10 space-y-8 page-transition">
+      {/* Profile Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
+            {(profile?.full_name || user?.email || "U").charAt(0).toUpperCase()}
           </div>
+          <div>
+            <h1 className="text-2xl font-bold">{profile?.full_name || "User"}</h1>
+            <p className="text-sm text-muted-foreground">{user?.email}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/sell")}
+          >
+            <ShoppingBag className="h-4 w-4 mr-2" />
+            Seller Dashboard
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={signOut}
+          >
+            Sign Out
+          </Button>
         </div>
       </div>
 
-      <div className="container py-8">
-        <div className="grid lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <aside className="space-y-2">
-            <button
-              onClick={() => setActiveTab("bids")}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors",
-                activeTab === "bids"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Gavel className="h-4 w-4" />
-              Active Bids
-            </button>
-            <button
-              onClick={() => setActiveTab("won")}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors",
-                activeTab === "won"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Trophy className="h-4 w-4" />
-              Won Auctions
-            </button>
-            <button
-              onClick={() => setActiveTab("orders")}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors",
-                activeTab === "orders"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Package className="h-4 w-4" />
-              Orders
-            </button>
-            <button
-              onClick={() => setActiveTab("wallet")}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors",
-                activeTab === "wallet"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Wallet className="h-4 w-4" />
-              Wallet
-            </button>
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors",
-                activeTab === "settings"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </button>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {summaryCards.map((card, i) => (
+          <Card
+            key={card.title}
+            className="card-hover stagger-item"
+            style={{ "--stagger-index": i } as React.CSSProperties}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className={cn("p-2 rounded-lg", card.bg)}>
+                  <card.icon className={cn("h-5 w-5", card.color)} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold">{card.value}</p>
+              <p className="text-xs text-muted-foreground mt-1">{card.title}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-            <div className="pt-4 border-t border-border">
-              <button
-                onClick={() => signOut()}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors">
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </button>
-            </div>
-          </aside>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="overview" className="gap-1.5">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="bids" className="gap-1.5">
+            <Gavel className="h-4 w-4" />
+            <span className="hidden sm:inline">Active Bids</span>
+          </TabsTrigger>
+          <TabsTrigger value="won" className="gap-1.5">
+            <Trophy className="h-4 w-4" />
+            <span className="hidden sm:inline">Won</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-1.5">
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Settings</span>
+          </TabsTrigger>
+        </TabsList>
 
-
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {activeTab === "bids" && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Active Bids</h2>
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="mt-6 space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Recent Bids */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Gavel className="h-4 w-4 text-primary" />
+                  Recent Bids
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 {activeBids.length === 0 ? (
-                  <p className="text-muted-foreground">You haven't placed any bids yet.</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">No active bids</p>
                 ) : (
-                  activeBids.map((bid) => (
-                    <Link
-                      key={bid.id}
-                      to={`/auctions/${bid.auction?.id}`}
-                      className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border hover:border-muted-foreground transition-colors"
-                    >
-                      <img
-                        src={bid.auction?.images?.[0] || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=200&h=200&fit=crop"}
-                        alt={bid.auction?.title}
-                        className="w-16 h-16 rounded-lg object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium line-clamp-1">{bid.auction?.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Your bid: ${bid.amount.toLocaleString()} • Status: {bid.auction?.status}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">${bid.auction?.current_price.toLocaleString()}</p>
-                        <span
-                          className={cn(
-                            "text-xs font-medium px-2 py-0.5 rounded-full",
-                            bid.amount >= bid.auction?.current_price
-                              ? "bg-success/20 text-success"
-                              : "bg-destructive/20 text-destructive"
+                  <div className="space-y-3">
+                    {activeBids.slice(0, 5).map((bid) => (
+                      <Link
+                        key={bid.auction_id}
+                        to={`/auctions/${bid.auction_id}`}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="h-10 w-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                          {bid.image && (
+                            <img src={bid.image} alt="" className="h-full w-full object-cover" />
                           )}
-                        >
-                          {bid.amount >= bid.auction?.current_price ? "Winning" : "Outbid"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{bid.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Your bid: ${bid.my_highest_bid.toLocaleString()}
+                          </p>
+                        </div>
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-full",
+                          bid.is_winning
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-destructive/10 text-destructive"
+                        )}>
+                          {bid.is_winning ? (
+                            <span className="flex items-center gap-1">
+                              <ArrowUpRight className="h-3 w-3" /> Winning
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <ArrowDownRight className="h-3 w-3" /> Outbid
+                            </span>
+                          )}
                         </span>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </Link>
-                  ))
+                      </Link>
+                    ))}
+                  </div>
                 )}
-              </div>
-            )}
+              </CardContent>
+            </Card>
 
-            {activeTab === "won" && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Won Auctions</h2>
+            {/* Recent Wins */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-500" />
+                  Recent Wins
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 {wonAuctions.length === 0 ? (
-                  <p className="text-muted-foreground">You haven't won any auctions yet.</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">No auctions won yet</p>
                 ) : (
-                  wonAuctions.map((auction) => (
-                    <div
-                      key={auction.id}
-                      className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border"
-                    >
-                      <img
-                        src={auction.images?.[0] || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=200&h=200&fit=crop"}
-                        alt={auction.title}
-                        className="w-16 h-16 rounded-lg object-cover"
-                      />
-                      <div className="flex-1">
-                        <h3 className="font-medium">{auction.title}</h3>
-                        <p className="text-sm text-muted-foreground">{new Date(auction.end_time).toLocaleDateString()}</p>
+                  <div className="space-y-3">
+                    {wonAuctions.slice(0, 5).map((won) => (
+                      <Link
+                        key={won.id}
+                        to={`/auctions/${won.auction?.id}`}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="h-10 w-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                          {won.auction?.images?.[0] && (
+                            <img src={won.auction.images[0]} alt="" className="h-full w-full object-cover" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{won.auction?.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(won.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold text-emerald-500">
+                          ${Number(won.winning_bid).toLocaleString()}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Active Bids Tab */}
+        <TabsContent value="bids" className="mt-6">
+          {activeBids.length === 0 ? (
+            <EmptyState
+              icon={Gavel}
+              title="No active bids"
+              description="Start browsing auctions and place your first bid."
+              actionLabel="Browse Auctions"
+              onAction={() => navigate("/auctions")}
+            />
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeBids.map((bid, i) => (
+                <Link
+                  key={bid.auction_id}
+                  to={`/auctions/${bid.auction_id}`}
+                  className="stagger-item"
+                  style={{ "--stagger-index": i } as React.CSSProperties}
+                >
+                  <Card className="card-hover overflow-hidden">
+                    <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+                      {bid.image ? (
+                        <img src={bid.image} alt={bid.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <Gavel className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <span className={cn(
+                        "absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-full",
+                        bid.is_winning
+                          ? "bg-emerald-500 text-white"
+                          : "bg-destructive text-white"
+                      )}>
+                        {bid.is_winning ? "Winning" : "Outbid"}
+                      </span>
+                    </div>
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-sm truncate mb-2">{bid.title}</h3>
+                      <div className="flex items-center justify-between text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Current Price</p>
+                          <p className="font-semibold">${bid.current_price.toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Your Bid</p>
+                          <p className="font-semibold">${bid.my_highest_bid.toLocaleString()}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">${auction.current_price.toLocaleString()}</p>
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-success/20 text-success">
-                          Won
+                      <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {formatDistanceToNow(new Date(bid.end_time), { addSuffix: true })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Won Tab */}
+        <TabsContent value="won" className="mt-6">
+          {wonAuctions.length === 0 ? (
+            <EmptyState
+              icon={Trophy}
+              title="No auctions won yet"
+              description="Keep bidding to win your first auction!"
+              actionLabel="Browse Auctions"
+              onAction={() => navigate("/auctions")}
+            />
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {wonAuctions.map((won, i) => (
+                <Link
+                  key={won.id}
+                  to={`/auctions/${won.auction?.id}`}
+                  className="stagger-item"
+                  style={{ "--stagger-index": i } as React.CSSProperties}
+                >
+                  <Card className="card-hover overflow-hidden">
+                    <div className="aspect-[4/3] bg-muted overflow-hidden relative">
+                      {won.auction?.images?.[0] ? (
+                        <img
+                          src={won.auction.images[0]}
+                          alt={won.auction.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <Trophy className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <span className="absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500 text-white">
+                        🏆 Won
+                      </span>
+                    </div>
+                    <CardContent className="p-4 space-y-2">
+                      <h3 className="font-semibold text-sm truncate">{won.auction?.title}</h3>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Winning bid</span>
+                        <span className="font-bold text-emerald-500">
+                          ${Number(won.winning_bid).toLocaleString()}
                         </span>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{formatDistanceToNow(new Date(won.created_at), { addSuffix: true })}</span>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-xs font-medium",
+                          won.payment_status === "paid"
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-amber-500/10 text-amber-500"
+                        )}>
+                          {won.payment_status}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
-            {activeTab === "orders" && (
-              <div className="text-center py-12 text-muted-foreground">
-                No orders found.
+        {/* Settings Tab */}
+        <TabsContent value="settings" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Account Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 max-w-md">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Your name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={user?.email || ""}
+                    disabled
+                    className="opacity-50"
+                  />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                </div>
               </div>
-            )}
 
-            {activeTab === "wallet" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Wallet</h2>
-                <div className="p-6 rounded-xl bg-card border border-border">
-                  <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
-                  <p className="text-4xl font-bold">$1,250.00</p>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <Button size="lg" className="w-full">Add Funds</Button>
-                  <Button variant="outline" size="lg" className="w-full">Withdraw</Button>
-                </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "Profile Updated",
+                      description: "Your profile has been saved.",
+                    });
+                  }}
+                >
+                  Save Changes
+                </Button>
               </div>
-            )}
 
-            {activeTab === "settings" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Settings</h2>
-                <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-                  <div>
-                    <label className="text-sm text-muted-foreground">Display Name</label>
-                    <Input defaultValue="John Doe" className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Email</label>
-                    <Input defaultValue="john@example.com" className="mt-1" />
-                  </div>
-                  <Button>Save Changes</Button>
-                </div>
+              <div className="border-t border-border pt-6 mt-6">
+                <h3 className="text-sm font-semibold text-destructive mb-2">Danger Zone</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={signOut}
+                >
+                  Sign Out of Account
+                </Button>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -1,38 +1,36 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>E-commerce Store</title>
-    <meta name="description" content="E-commerce store" />
-    <meta name="author" content="E-commerce Store" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="E-commerce Store" />
-    <meta property="og:description" content="E-commerce store" />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BidVault — Live Auctions & Premium Products</title>
+  <meta name="description"
+    content="Discover, bid on, and buy unique items on BidVault — the trusted marketplace for live auctions and premium products." />
+  <meta name="author" content="BidVault" />
 
-  <body>
-    <div id="root"></div>
+  <meta property="og:title" content="BidVault — Live Auctions & Premium Products" />
+  <meta property="og:description"
+    content="Discover, bid on, and buy unique items on BidVault — the trusted marketplace for live auctions and premium products." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+</head>
 
-    <svg xmlns="http://www.w3.org/2000/svg" version="1.1" style="position: absolute; width: 0; height: 0;">
-      <defs>
-        <filter id="goo">
-          <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="10"></feGaussianBlur>
-          <feColorMatrix
-            in="blur"
-            mode="matrix"
-            values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 21 -7"
-            result="goo"
-          ></feColorMatrix>
-          <feBlend in2="goo" in="SourceGraphic" result="mix"></feBlend>
-        </filter>
-      </defs>
-    </svg>
+<body>
+  <div id="root"></div>
 
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+  <svg xmlns="http://www.w3.org/2000/svg" version="1.1" style="position: absolute; width: 0; height: 0;">
+    <defs>
+      <filter id="goo">
+        <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="10"></feGaussianBlur>
+        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 21 -7" result="goo">
+        </feColorMatrix>
+        <feBlend in2="goo" in="SourceGraphic" result="mix"></feBlend>
+      </filter>
+    </defs>
+  </svg>
+
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
